@@ -66,8 +66,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() {
         _isLoading = false;
       });
-      // Navigate to Sign In on success
-      Navigator.of(context).pushReplacementNamed(RouteNames.signIn);
+      // After sign-up, navigate to the personalisation questionnaire
+      Navigator.of(context).pushReplacementNamed(
+        RouteNames.questionnaireIntro,
+        arguments: _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : null,
+      );
     }
   }
 
