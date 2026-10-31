@@ -16,7 +16,11 @@ import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/programs/presentation/program_detail_screen.dart';
 import '../../features/programs/presentation/phase_detail_screen.dart';
 import '../../features/programs/presentation/phase_learn_screen.dart';
+import '../../features/programs/presentation/phase_watch_screen.dart';
+import '../../features/programs/presentation/phase_activity_screen.dart';
+import '../../features/programs/presentation/phase_quiz_screen.dart';
 import '../../features/programs/presentation/lesson_detail_screen.dart';
+import '../../features/programs/presentation/video_detail_screen.dart';
 import '../../features/support/presentation/support_options_screen.dart';
 import '../../features/welcome/presentation/welcome_screen.dart';
 import 'route_names.dart';
@@ -123,8 +127,37 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildPage(const PhaseLearnScreen(), state),
       ),
       GoRoute(
+        path: RouteNames.phaseWatch,
+        pageBuilder: (context, state) => _buildPage(const PhaseWatchScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.phaseActivity,
+        pageBuilder: (context, state) => _buildPage(const PhaseActivityScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.phaseQuiz,
+        pageBuilder: (context, state) => _buildPage(const PhaseQuizScreen(), state),
+      ),
+      GoRoute(
         path: RouteNames.lessonDetail,
         pageBuilder: (context, state) => _buildPage(const LessonDetailScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.videoDetail,
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return _buildPage(
+            VideoDetailScreen(
+              videoNumber: extra?['videoNumber'] ?? 1,
+              totalVideos: extra?['totalVideos'] ?? 3,
+              videoTitle: extra?['videoTitle'] ?? "Let's Redefine Mental Health",
+              videoDescription: extra?['videoDescription'] ??
+                  "Why mental health is something everyone has, not just a label for illness.",
+              duration: extra?['duration'] ?? "1:12",
+            ),
+            state,
+          );
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

@@ -29,7 +29,7 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Your Focus
-                  _buildYourFocusSection(),
+                  _buildYourFocusSection(context),
                   const SizedBox(height: 24),
 
                   // Support Banner Card
@@ -102,7 +102,7 @@ class HomeScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.search_rounded,
+                  Icons.notifications,
                   size: 20,
                   color: Colors.white,
                 ),
@@ -298,7 +298,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildYourFocusSection() {
+  Widget _buildYourFocusSection(BuildContext context) {
     final phases = [
       {
         'title': "Phase 1: How's Your Head. Really?",
@@ -337,7 +337,9 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                context.push(RouteNames.questionnaireResults);
+              },
               child: Text(
                 'Why?',
                 style: GoogleFonts.plusJakartaSans(

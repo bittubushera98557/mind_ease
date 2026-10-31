@@ -32,6 +32,18 @@ class RouteNames {
   // Phase Learn
   static const String phaseLearn = '/phase-learn';
 
+  // Phase Watch
+  static const String phaseWatch = '/phase-watch';
+
+  // Phase Activity
+  static const String phaseActivity = '/phase-activity';
+
+  // Phase Quiz
+  static const String phaseQuiz = '/phase-quiz';
+
+  // Video Detail
+  static const String videoDetail = '/video-detail';
+
   // Lesson Detail
   static const String lessonDetail = '/lesson-detail';
 }
