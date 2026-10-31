@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/config/app_constants.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
@@ -60,7 +61,7 @@ class WelcomeScreen extends StatelessWidget {
               AppButton(
                 text: 'Get started',
                 onPressed: () {
-                  Navigator.of(context).pushNamed(RouteNames.signUp);
+                  context.push(RouteNames.signUp);
                 },
               ),
               const SizedBox(height: 18),
@@ -75,7 +76,7 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                   GestureDetector(
                     onTap: () {
-                      Navigator.of(context).pushNamed(RouteNames.signIn);
+                      context.push(RouteNames.signIn);
                     },
                     child: Text(
                       'Sign in',

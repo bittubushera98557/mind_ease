@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -132,17 +133,13 @@ class _QuestionnaireQ1GoalsScreenState
                     text: 'Continue',
                     onPressed: _selectedGoals.isNotEmpty
                         ? () {
-                            Navigator.of(context).pushNamed(
-                              RouteNames.questionnaireQ2Mood,
-                            );
+                            context.push(RouteNames.questionnaireQ2Mood);
                           }
                         : null,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   GestureDetector(
-                    onTap: () => Navigator.of(context).pushNamed(
-                      RouteNames.questionnaireQ2Mood,
-                    ),
+                    onTap: () => context.push(RouteNames.questionnaireQ2Mood),
                     child: Text(
                       'Skip this question',
                       style: AppTypography.footerRegular.copyWith(

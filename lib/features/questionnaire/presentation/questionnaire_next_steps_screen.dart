@@ -1,39 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_button.dart';
 
 /// 1.11 Next Steps Screen – "Your Next Steps"
 class QuestionnaireNextStepsScreen extends StatelessWidget {
   const QuestionnaireNextStepsScreen({Key? key}) : super(key: key);
 
-  static const List<_NextStep> _steps = [
-    _NextStep(
-      number: 1,
+  static const List<_NextStepData> _steps = [
+    _NextStepData(
       title: 'Setup Profile & Assessment',
-      subtitle: "You've set up your profile and answered the questionnaire",
-      isCompleted: true,
+      subtitle: "You've set up your profile and answered the questionnaire.",
+      icon: Icons.check_rounded,
+      type: _StepType.completed,
     ),
-    _NextStep(
-      number: 2,
+    _NextStepData(
       title: 'Receive Personalised Suggestions',
-      subtitle: 'Your personalised program is ready to explore',
-      isCompleted: false,
-      isCurrent: true,
+      subtitle: 'Your recommended phases are ready in My Programs.',
+      icon: Icons.auto_awesome_rounded,
+      type: _StepType.activeSparkle,
     ),
-    _NextStep(
-      number: 3,
+    _NextStepData(
       title: 'Start Your First Program',
-      subtitle: "Begin with the Self-Reflection Program",
-      isCompleted: false,
+      subtitle: 'Begin Phase 1 of the Self-Reflection Program.',
+      icon: Icons.menu_book_rounded,
+      type: _StepType.highlighted,
     ),
-    _NextStep(
-      number: 4,
+    _NextStepData(
       title: 'Schedule Therapy Appointment',
-      subtitle: 'Book a therapist when you\'re ready. Coming soon.',
-      isCompleted: false,
-      isDisabled: true,
+      subtitle: "Book a therapist when you're ready. Coming soon.",
+      icon: Icons.calendar_today_rounded,
+      type: _StepType.disabled,
     ),
   ];
 
@@ -44,95 +44,57 @@ class QuestionnaireNextStepsScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Top close/back button
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                0,
-              ),
-              child: Row(
-                children: [
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).maybePop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.xl),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(height: AppSpacing.xl),
+                    const SizedBox(height: 36),
 
-                    // Header text
-                    Center(
-                      child: Column(
-                        children: [
-                          Text(
-                            'Your Next Steps',
-                            style: AppTypography.displayMedium.copyWith(
-                              fontSize: 28,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            "You're all set up. Here's what comes next:",
-                            style: AppTypography.bodyMedium.copyWith(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                    // Header title
+                    Text(
+                      'Your Next Steps',
+                      style: GoogleFonts.outfit(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.3,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: AppSpacing.xxxl),
+                    const SizedBox(height: 8),
+
+                    // Header subtitle
+                    Text(
+                      "You're all set up. Here's what comes next.",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
 
                     // Steps timeline
                     ..._buildStepsTimeline(),
 
-                    const SizedBox(height: AppSpacing.xxxl),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
             ),
 
-            // Bottom CTA
+            // Bottom Action Button
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                0,
-                AppSpacing.xl,
-                AppSpacing.xl,
-              ),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               child: AppButton(
                 text: "OK, let's get started",
+                icon: Icons.home_outlined,
                 onPressed: () {
-                  // Navigate to home / program listing
-                  // For now navigate back to root
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/',
-                    (route) => false,
-                  );
+                  context.go(RouteNames.dashboard);
                 },
               ),
             ),
@@ -147,155 +109,80 @@ class QuestionnaireNextStepsScreen extends StatelessWidget {
     for (int i = 0; i < _steps.length; i++) {
       final step = _steps[i];
       final isLast = i == _steps.length - 1;
-      widgets.add(_buildTimelineStep(step: step, isLast: isLast));
+
+      // Determine connector line color below step
+      Color lineColor = AppColors.primary;
+      if (step.type == _StepType.highlighted || step.type == _StepType.disabled) {
+        lineColor = const Color(0xFFE8E1D9);
+      }
+
+      widgets.add(
+        _buildTimelineStep(
+          step: step,
+          isLast: isLast,
+          lineColor: lineColor,
+        ),
+      );
     }
     return widgets;
   }
 
   Widget _buildTimelineStep({
-    required _NextStep step,
+    required _NextStepData step,
     required bool isLast,
+    required Color lineColor,
   }) {
-    Color circleColor;
-    Color borderColor;
-    Widget circleChild;
-
-    if (step.isCompleted) {
-      circleColor = AppColors.alertSuccessBg;
-      borderColor = AppColors.alertSuccessIcon;
-      circleChild = const Icon(
-        Icons.check_rounded,
-        size: 18,
-        color: AppColors.alertSuccessIcon,
-      );
-    } else if (step.isCurrent) {
-      circleColor = AppColors.primarySubtle;
-      borderColor = AppColors.primary;
-      circleChild = Container(
-        width: 10,
-        height: 10,
-        decoration: const BoxDecoration(
-          color: AppColors.primary,
-          shape: BoxShape.circle,
-        ),
-      );
-    } else {
-      circleColor = AppColors.surfaceMuted;
-      borderColor = AppColors.inputBorder;
-      circleChild = Text(
-        '${step.number}',
-        style: AppTypography.inputLabel.copyWith(
-          fontSize: 12,
-          color: step.isDisabled
-              ? AppColors.textTertiary
-              : AppColors.textSecondary,
-        ),
-      );
-    }
-
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Timeline column
-          Column(
-            children: [
-              // Circle indicator
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: circleColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: borderColor, width: 1.5),
-                ),
-                child: Center(child: circleChild),
-              ),
-              // Connector line
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.inputBorder,
-                      borderRadius: BorderRadius.circular(1),
+          // Timeline indicator column
+          SizedBox(
+            width: 54,
+            child: Column(
+              children: [
+                _buildStepIndicator(step),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 2),
+                      color: lineColor,
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: 14),
 
-          // Step content
+          // Content text column
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(
-                bottom: isLast ? 0 : AppSpacing.xl,
-                top: 6,
+                bottom: isLast ? 0 : 26.0,
+                top: step.type == _StepType.highlighted ? 12.0 : 8.0,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     step.title,
-                    style: AppTypography.inputLabel.copyWith(
-                      fontSize: 14.5,
-                      color: step.isDisabled
-                          ? AppColors.textTertiary
-                          : AppColors.textPrimary,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     step.subtitle,
-                    style: AppTypography.bodyMedium.copyWith(
-                      fontSize: 12.5,
-                      color: step.isDisabled
-                          ? AppColors.textTertiary
-                          : AppColors.textSecondary,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13.0,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textSecondary,
+                      height: 1.35,
                     ),
                   ),
-                  if (step.isCurrent) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySubtle,
-                        borderRadius: AppSpacing.roundedPill,
-                      ),
-                      child: Text(
-                        'Up next',
-                        style: AppTypography.bannerText.copyWith(
-                          fontSize: 11,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (step.isDisabled) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        borderRadius: AppSpacing.roundedPill,
-                      ),
-                      child: Text(
-                        'Coming soon',
-                        style: AppTypography.bannerText.copyWith(
-                          fontSize: 11,
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -304,22 +191,99 @@ class QuestionnaireNextStepsScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildStepIndicator(_NextStepData step) {
+    switch (step.type) {
+      case _StepType.completed:
+        return Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            color: AppColors.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            step.icon,
+            size: 20,
+            color: Colors.white,
+          ),
+        );
+
+      case _StepType.activeSparkle:
+        return Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            color: AppColors.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            step.icon,
+            size: 19,
+            color: Colors.white,
+          ),
+        );
+
+      case _StepType.highlighted:
+        return Container(
+          width: 54,
+          height: 54,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF7ECE5),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                step.icon,
+                size: 18,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        );
+
+      case _StepType.disabled:
+        return Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            color: Color(0xFFECE5DF),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            step.icon,
+            size: 18,
+            color: const Color(0xFF8E847C),
+          ),
+        );
+    }
+  }
 }
 
-class _NextStep {
-  final int number;
+enum _StepType {
+  completed,
+  activeSparkle,
+  highlighted,
+  disabled,
+}
+
+class _NextStepData {
   final String title;
   final String subtitle;
-  final bool isCompleted;
-  final bool isCurrent;
-  final bool isDisabled;
+  final IconData icon;
+  final _StepType type;
 
-  const _NextStep({
-    required this.number,
+  const _NextStepData({
     required this.title,
     required this.subtitle,
-    this.isCompleted = false,
-    this.isCurrent = false,
-    this.isDisabled = false,
+    required this.icon,
+    required this.type,
   });
 }

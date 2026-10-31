@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
-import '../../../core/config/app_constants.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/curved_header.dart';
+import 'providers/auth_provider.dart';
+import 'providers/auth_state.dart';
 
 /// 1.03 Sign Up Screen ("Sign Up For Free")
-class SignUpScreen extends StatefulWidget {
+class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nameController;
@@ -23,15 +28,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
   late final TextEditingController _passwordController;
   late final TextEditingController _confirmPasswordController;
 
-  bool _isLoading = false;
-  String? _nameError = 'Enter your name.'; // Match exact mockup state initially
+  // Field validation errors
+  String? _nameError;
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmPasswordError;
+  String? _bannerError;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _emailController = TextEditingController(text: AppConstants.mockUserEmail);
-    _passwordController = TextEditingController(text: 'secret123');
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
   }
 
@@ -44,40 +53,102 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  Future<void> _handleSignUp() async {
+  bool _validateForm() {
+    bool isValid = true;
+
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+
     setState(() {
-      if (_nameController.text.trim().isEmpty) {
+      if (name.isEmpty) {
         _nameError = 'Enter your name.';
+        isValid = false;
       } else {
         _nameError = null;
       }
+
+      if (email.isEmpty) {
+        _emailError = 'Enter your email address.';
+        isValid = false;
+      } else if (!emailRegex.hasMatch(email)) {
+        _emailError = 'Enter a valid email address.';
+        isValid = false;
+      } else {
+        _emailError = null;
+      }
+
+      if (password.isEmpty) {
+        _passwordError = 'Enter your password.';
+        isValid = false;
+      } else if (password.length < 6) {
+        _passwordError = 'Use at least 6 characters.';
+        isValid = false;
+      } else {
+        _passwordError = null;
+      }
+
+      if (confirmPassword.isEmpty) {
+        _confirmPasswordError = 'Confirm your password.';
+        isValid = false;
+      } else if (confirmPassword != password) {
+        _confirmPasswordError = 'Passwords do not match.';
+        isValid = false;
+      } else {
+        _confirmPasswordError = null;
+      }
     });
 
-    if (_nameError != null) return;
+    return isValid;
+  }
 
+  Future<void> _handleSignUp() async {
     setState(() {
-      _isLoading = true;
+      _bannerError = null;
     });
 
-    // Simulate API sign up call
-    await Future.delayed(const Duration(milliseconds: 1000));
+    if (!_validateForm()) return;
+
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    final success = await ref.read(authNotifierProvider.notifier).register(
+          name: name,
+          email: email,
+          password: password,
+        );
 
     if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      // After sign-up, navigate to the personalisation questionnaire
-      Navigator.of(context).pushReplacementNamed(
-        RouteNames.questionnaireIntro,
-        arguments: _nameController.text.trim().isNotEmpty
-            ? _nameController.text.trim()
-            : null,
-      );
+      if (success) {
+        context.go(RouteNames.questionnaireIntro, extra: name);
+      } else {
+        final authState = ref.read(authStateProvider);
+        if (authState.status == AuthStatus.error) {
+          setState(() {
+            if (authState.errorField == 'email' || authState.errorCode == 'email_taken') {
+              _emailError = authState.errorMessage;
+            } else if (authState.errorField == 'name') {
+              _nameError = authState.errorMessage;
+            } else if (authState.errorField == 'password') {
+              _passwordError = authState.errorMessage;
+            } else {
+              _bannerError = authState.errorMessage;
+            }
+          });
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final isLoading = authState.status == AuthStatus.loading;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SingleChildScrollView(
@@ -86,7 +157,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             // Top Terracotta Curved Wave Header with Back Button and Logo
             CurvedHeader(
               height: 140,
-              onBack: () => Navigator.of(context).maybePop(),
+              onBack: () => context.pop(),
             ),
 
             Padding(
@@ -105,14 +176,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Your Name field (shows validation state from mockup)
+                    // Error Alert Banner
+                    if (_bannerError != null) ...[
+                      AppBanner.error(
+                        message: _bannerError!,
+                        onClose: () {
+                          setState(() {
+                            _bannerError = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+
+                    // Your Name field
                     AppTextField(
                       label: 'Your Name',
                       hintText: 'Enter your name',
                       controller: _nameController,
                       prefixIcon: Icons.person_outline_rounded,
                       errorText: _nameError,
-                      state: _nameError != null ? AppTextFieldState.error : AppTextFieldState.normal,
+                      state: _nameError != null
+                          ? AppTextFieldState.error
+                          : AppTextFieldState.normal,
                       onChanged: (val) {
                         if (_nameError != null && val.trim().isNotEmpty) {
                           setState(() {
@@ -130,18 +216,38 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       controller: _emailController,
                       prefixIcon: Icons.mail_outline_rounded,
                       keyboardType: TextInputType.emailAddress,
+                      errorText: _emailError,
+                      state: _emailError != null
+                          ? AppTextFieldState.error
+                          : AppTextFieldState.normal,
+                      onChanged: (val) {
+                        if (_emailError != null && val.trim().isNotEmpty) {
+                          setState(() {
+                            _emailError = null;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 14),
 
-                    // Password field (shows validation state from mockup)
+                    // Password field
                     AppTextField(
                       label: 'Password',
                       hintText: 'Enter your password',
                       controller: _passwordController,
                       isPassword: true,
                       prefixIcon: Icons.lock_outline_rounded,
-                      errorText: 'Use at least 8 characters.',
-                      state: AppTextFieldState.error,
+                      errorText: _passwordError,
+                      state: _passwordError != null
+                          ? AppTextFieldState.error
+                          : AppTextFieldState.normal,
+                      onChanged: (val) {
+                        if (_passwordError != null && val.trim().isNotEmpty) {
+                          setState(() {
+                            _passwordError = null;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 14),
 
@@ -152,15 +258,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       controller: _confirmPasswordController,
                       isPassword: true,
                       prefixIcon: Icons.lock_outline_rounded,
+                      errorText: _confirmPasswordError,
+                      state: _confirmPasswordError != null
+                          ? AppTextFieldState.error
+                          : AppTextFieldState.normal,
                       textInputAction: TextInputAction.done,
+                      onChanged: (val) {
+                        if (_confirmPasswordError != null && val.trim().isNotEmpty) {
+                          setState(() {
+                            _confirmPasswordError = null;
+                          });
+                        }
+                      },
                       onSubmitted: (_) => _handleSignUp(),
                     ),
                     const SizedBox(height: 24),
 
-                    // "Sign Up  →" Button
+                    // "Sign Up" Button
                     AppButton(
                       text: 'Sign Up',
-                      isLoading: _isLoading,
+                      isLoading: isLoading,
                       onPressed: _handleSignUp,
                     ),
                     const SizedBox(height: 16),
@@ -175,7 +292,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.of(context).pushReplacementNamed(RouteNames.signIn);
+                            context.pushReplacement(RouteNames.signIn);
                           },
                           child: Text(
                             'Sign in',

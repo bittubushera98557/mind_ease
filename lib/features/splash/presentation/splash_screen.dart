@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/mind_ease_logo.dart';
@@ -40,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // Auto navigate to Welcome Screen after 2.5 seconds
     _navigationTimer = Timer(const Duration(milliseconds: 2500), () {
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed(RouteNames.welcome);
+        context.pushReplacement(RouteNames.welcome);
       }
     });
   }
@@ -54,7 +55,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   void _skip() {
     _navigationTimer?.cancel();
-    Navigator.of(context).pushReplacementNamed(RouteNames.welcome);
+    context.pushReplacement(RouteNames.welcome);
   }
 
   @override

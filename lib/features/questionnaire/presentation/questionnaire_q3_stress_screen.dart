@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -126,17 +127,13 @@ class _QuestionnaireQ3StressScreenState
                     text: 'Continue',
                     onPressed: _selectedStress != null
                         ? () {
-                            Navigator.of(context).pushNamed(
-                              RouteNames.questionnaireResults,
-                            );
+                            context.push(RouteNames.questionnaireResults);
                           }
                         : null,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   GestureDetector(
-                    onTap: () => Navigator.of(context).pushNamed(
-                      RouteNames.questionnaireResults,
-                    ),
+                    onTap: () => context.push(RouteNames.questionnaireResults),
                     child: Text(
                       'Skip this question',
                       style: AppTypography.footerRegular.copyWith(

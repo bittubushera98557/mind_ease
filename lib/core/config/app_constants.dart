@@ -14,7 +14,7 @@ class AppConstants {
   static const String keyIsFirstTime = 'is_first_time';
 
   // Demo / Mock defaults from design
-  static const String mockUserEmail = 'ramcy@hyperiontech.com.au';
+  static const String mockUserEmail = '';
 
   // Assets
   static const String logoImage = 'assets/images/logo.png';

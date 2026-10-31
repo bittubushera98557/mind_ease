@@ -15,9 +15,23 @@ class RouteNames {
   static const String questionnaireQ3Stress = '/questionnaire/q3-stress';
   static const String questionnaireResults = '/questionnaire/results';
   static const String questionnaireNextSteps = '/questionnaire/next-steps';
-
- // static const String questionnaireNextSteps = '/questionnaire/next-steps';
-
-  // Single data-driven survey screen (replaces Q1/Q2/Q3 in the main flow)
   static const String questionnaireSurvey = '/questionnaire/survey';
+
+  // Main Dashboard & Tab Navigation (2.01 – 2.04)
+  static const String dashboard = '/dashboard';
+
+  // Support Options / Get Help Now
+  static const String supportOptions = '/support-options';
+
+  // Program Detail / Overview
+  static const String programDetail = '/program-detail';
+
+  // Phase Detail
+  static const String phaseDetail = '/phase-detail';
+
+  // Phase Learn
+  static const String phaseLearn = '/phase-learn';
+
+  // Lesson Detail
+  static const String lessonDetail = '/lesson-detail';
 }

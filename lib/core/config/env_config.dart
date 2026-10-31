@@ -36,7 +36,7 @@ class EnvConfig {
         _instance = EnvConfig._(
           environment: AppEnvironment.dev,
           appName: 'MindEase (Dev)',
-          apiBaseUrl: customBaseUrl ?? 'https://api-dev.mindease.app/v1',
+          apiBaseUrl: customBaseUrl ?? 'https://api.mindease.me/v1',
           apiTimeout: customTimeout ?? const Duration(seconds: 30),
           enableLogging: enableLogging ?? true,
         );
@@ -45,7 +45,7 @@ class EnvConfig {
         _instance = EnvConfig._(
           environment: AppEnvironment.staging,
           appName: 'MindEase (Staging)',
-          apiBaseUrl: customBaseUrl ?? 'https://api-staging.mindease.app/v1',
+          apiBaseUrl: customBaseUrl ?? 'https://api.mindease.me/v1',
           apiTimeout: customTimeout ?? const Duration(seconds: 30),
           enableLogging: enableLogging ?? true,
         );
@@ -54,7 +54,7 @@ class EnvConfig {
         _instance = EnvConfig._(
           environment: AppEnvironment.prod,
           appName: 'MindEase',
-          apiBaseUrl: customBaseUrl ?? 'https://api.mindease.app/v1',
+          apiBaseUrl: customBaseUrl ?? 'https://api.mindease.me/v1',
           apiTimeout: customTimeout ?? const Duration(seconds: 15),
           enableLogging: enableLogging ?? false,
         );

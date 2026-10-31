@@ -2,16 +2,21 @@
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
+  final String? code;
+  final String? field;
   final dynamic details;
 
   const ApiException({
     required this.message,
     this.statusCode,
+    this.code,
+    this.field,
     this.details,
   });
 
   @override
-  String toString() => 'ApiException(statusCode: $statusCode, message: $message)';
+  String toString() =>
+      'ApiException(statusCode: $statusCode, code: $code, field: $field, message: $message)';
 }
 
 class NetworkException extends ApiException {

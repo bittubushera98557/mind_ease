@@ -10,6 +10,7 @@ class AppButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool showArrow;
+  final IconData? icon;
   final double? width;
   final double height;
   final Color? backgroundColor;
@@ -21,6 +22,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.showArrow = true,
+    this.icon,
     this.width,
     this.height = AppSpacing.buttonHeight,
     this.backgroundColor,
@@ -72,7 +74,7 @@ class AppButton extends StatelessWidget {
                   if (showArrow) ...[
                     const SizedBox(width: 8),
                     Icon(
-                      Icons.arrow_forward_rounded,
+                      icon ?? Icons.arrow_forward_rounded,
                       size: 18,
                       color: effectiveTextColor,
                     ),

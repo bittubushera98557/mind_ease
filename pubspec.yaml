@@ -39,6 +39,11 @@ dependencies:
   http: ^0.13.5
   google_fonts: ^4.0.4
   shared_preferences: ^2.2.0
+  riverpod: any
+  flutter_riverpod: any
+  go_router: ^6.0.0
+  dio: ^5.11.1
+  flutter_secure_storage: any
 
 dev_dependencies:
   flutter_test:

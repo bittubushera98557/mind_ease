@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../router/route_names.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -145,7 +146,7 @@ class ScreenSwitcherPill extends StatelessWidget {
       trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textTertiary),
       onTap: () {
         Navigator.of(context).pop();
-        Navigator.of(context).pushNamed(route);
+        context.push(route);
       },
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/config/app_constants.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
@@ -120,7 +121,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               Center(
                 child: GestureDetector(
                   onTap: () {
-                    Navigator.of(context).pushReplacementNamed(RouteNames.signIn);
+                    context.pushReplacement(RouteNames.signIn);
                   },
                   child: Text(
                     'Back to sign in',

@@ -1,114 +1,169 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../features/auth/presentation/forgot_password_screen.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/auth/presentation/providers/auth_state.dart';
 import '../../features/auth/presentation/sign_in_screen.dart';
 import '../../features/auth/presentation/sign_up_screen.dart';
+import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/questionnaire/presentation/questionnaire_intro_screen.dart';
 import '../../features/questionnaire/presentation/questionnaire_next_steps_screen.dart';
 import '../../features/questionnaire/presentation/questionnaire_results_screen.dart';
 import '../../features/questionnaire/presentation/questionnaire_survey_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/programs/presentation/program_detail_screen.dart';
+import '../../features/programs/presentation/phase_detail_screen.dart';
+import '../../features/programs/presentation/phase_learn_screen.dart';
+import '../../features/programs/presentation/lesson_detail_screen.dart';
+import '../../features/support/presentation/support_options_screen.dart';
 import '../../features/welcome/presentation/welcome_screen.dart';
 import 'route_names.dart';
 
-/// MindEase Central Application Router
-class AppRouter {
-  AppRouter._();
+/// Riverpod Provider for GoRouter instance with Auth Guards
+final goRouterProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: RouteNames.splash,
+    refreshListenable: _RiverpodRefreshListenable(ref),
+    redirect: (BuildContext context, GoRouterState state) {
+      final authState = ref.read(authStateProvider);
 
-  static Route<dynamic> generateRoute(RouteSettings settings) {
-    switch (settings.name) {
-      case RouteNames.splash:
-        return _buildPageRoute(
-          const SplashScreen(),
-          settings,
-        );
+      final currentLocation = state.location;
+      final isAuthRoute = currentLocation == RouteNames.signIn ||
+          currentLocation == RouteNames.signUp ||
+          currentLocation == RouteNames.forgotPassword;
 
-      case RouteNames.welcome:
-        return _buildPageRoute(
-          const WelcomeScreen(),
-          settings,
-        );
+      // While checking initial auth state, remain on splash or requested page
+      if (authState.status == AuthStatus.initial || authState.status == AuthStatus.loading) {
+        return null;
+      }
 
-      case RouteNames.signUp:
-        return _buildPageRoute(
-          const SignUpScreen(),
-          settings,
-        );
+      // If user is authenticated and trying to access sign-in or sign-up, redirect to dashboard
+      if (authState.status == AuthStatus.authenticated && isAuthRoute) {
+        return RouteNames.dashboard;
+      }
 
-      case RouteNames.signIn:
-        return _buildPageRoute(
-          const SignInScreen(),
-          settings,
-        );
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: RouteNames.splash,
+        pageBuilder: (context, state) => _buildPage(const SplashScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.welcome,
+        pageBuilder: (context, state) => _buildPage(const WelcomeScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.signUp,
+        pageBuilder: (context, state) => _buildPage(const SignUpScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.signIn,
+        pageBuilder: (context, state) => _buildPage(const SignInScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.forgotPassword,
+        pageBuilder: (context, state) => _buildPage(const ForgotPasswordScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.dashboard,
+        pageBuilder: (context, state) {
+          final tabIndex = state.extra is int ? state.extra as int : 0;
+          return _buildPage(DashboardScreen(initialIndex: tabIndex), state);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.questionnaireIntro,
+        pageBuilder: (context, state) {
+          final userName = state.extra is String ? state.extra as String : 'Ramsey';
+          return _buildPage(QuestionnaireIntroScreen(userName: userName), state);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.questionnaireSurvey,
+        pageBuilder: (context, state) => _buildPage(const QuestionnaireSurveyScreen(), state),
+      ),
+      // Legacy questionnaire routes redirecting to survey screen
+      GoRoute(
+        path: RouteNames.questionnaireQ1Goals,
+        redirect: (context, state) => RouteNames.questionnaireSurvey,
+      ),
+      GoRoute(
+        path: RouteNames.questionnaireQ2Mood,
+        redirect: (context, state) => RouteNames.questionnaireSurvey,
+      ),
+      GoRoute(
+        path: RouteNames.questionnaireQ3Stress,
+        redirect: (context, state) => RouteNames.questionnaireSurvey,
+      ),
+      GoRoute(
+        path: RouteNames.questionnaireResults,
+        pageBuilder: (context, state) => _buildPage(const QuestionnaireResultsScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.questionnaireNextSteps,
+        pageBuilder: (context, state) => _buildPage(const QuestionnaireNextStepsScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.supportOptions,
+        pageBuilder: (context, state) => _buildPage(const SupportOptionsScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.programDetail,
+        pageBuilder: (context, state) => _buildPage(const ProgramDetailScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.phaseDetail,
+        pageBuilder: (context, state) => _buildPage(const PhaseDetailScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.phaseLearn,
+        pageBuilder: (context, state) => _buildPage(const PhaseLearnScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.lessonDetail,
+        pageBuilder: (context, state) => _buildPage(const LessonDetailScreen(), state),
+      ),
+    ],
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(
+        child: Text('No route defined for ${state.error}'),
+      ),
+    ),
+  );
+});
 
-      case RouteNames.forgotPassword:
-        return _buildPageRoute(
-          const ForgotPasswordScreen(),
-          settings,
-        );
+/// Page transition builder
+CustomTransitionPage<void> _buildPage(Widget child, GoRouterState state) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(0.05, 0.0);
+      const end = Offset.zero;
+      const curve = Curves.easeOutCubic;
 
-      case RouteNames.questionnaireIntro:
-        return _buildPageRoute(
-          const QuestionnaireIntroScreen(),
-          settings,
-        );
+      final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+      final offsetAnimation = animation.drive(tween);
+      final fadeAnimation = CurvedAnimation(parent: animation, curve: Curves.easeIn);
 
-      // New consolidated survey (all 9 questions in one screen)
-      case RouteNames.questionnaireSurvey:
-      // Legacy per-question routes — all redirect to the survey screen
-      case RouteNames.questionnaireQ1Goals:
-      case RouteNames.questionnaireQ2Mood:
-      case RouteNames.questionnaireQ3Stress:
-        return _buildPageRoute(
-          const QuestionnaireSurveyScreen(),
-          settings,
-        );
+      return SlideTransition(
+        position: offsetAnimation,
+        child: FadeTransition(
+          opacity: fadeAnimation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
-      case RouteNames.questionnaireResults:
-        return _buildPageRoute(
-          const QuestionnaireResultsScreen(),
-          settings,
-        );
-
-      case RouteNames.questionnaireNextSteps:
-        return _buildPageRoute(
-          const QuestionnaireNextStepsScreen(),
-          settings,
-        );
-
-      default:
-        return _buildPageRoute(
-          Scaffold(
-            body: Center(
-              child: Text('No route defined for ${settings.name}'),
-            ),
-          ),
-          settings,
-        );
-    }
-  }
-
-  static PageRouteBuilder _buildPageRoute(Widget page, RouteSettings settings) {
-    return PageRouteBuilder(
-      settings: settings,
-      pageBuilder: (context, animation, secondaryAnimation) => page,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(0.05, 0.0);
-        const end = Offset.zero;
-        const curve = Curves.easeOutCubic;
-
-        final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-        final offsetAnimation = animation.drive(tween);
-        final fadeAnimation = CurvedAnimation(parent: animation, curve: Curves.easeIn);
-
-        return SlideTransition(
-          position: offsetAnimation,
-          child: FadeTransition(
-            opacity: fadeAnimation,
-            child: child,
-          ),
-        );
-      },
-      transitionDuration: const Duration(milliseconds: 260),
-    );
+/// Helper class to bridge Riverpod Provider updates to GoRouter refreshListenable
+class _RiverpodRefreshListenable extends ChangeNotifier {
+  _RiverpodRefreshListenable(Ref ref) {
+    ref.listen<AuthState>(authStateProvider, (_, __) => notifyListeners());
   }
 }
