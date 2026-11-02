@@ -75,15 +75,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState.authenticated(authResponse.user);
       return true;
     } on ApiException catch (e) {
-      state = AuthState.error(
+      state = AuthState.signUpError(
         message: e.message,
         field: e.field,
         code: e.code,
       );
       return false;
     } catch (e) {
-      state = AuthState.error(
-        message: 'An unexpected error occurred. Please try again.',
+      state = AuthState.signUpError(
+        message: e is Exception
+            ? e.toString().replaceAll('Exception: ', '')
+            : 'An unexpected error occurred. Please try again.',
       );
       return false;
     }
@@ -105,15 +107,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthState.authenticated(authResponse.user);
       return true;
     } on ApiException catch (e) {
-      state = AuthState.error(
+      state = AuthState.loginError(
         message: e.message,
         field: e.field,
         code: e.code,
       );
       return false;
     } catch (e) {
-      state = AuthState.error(
-        message: 'An unexpected error occurred. Please try again.',
+      state = AuthState.loginError(
+        message: e is Exception
+            ? e.toString().replaceAll('Exception: ', '')
+            : 'An unexpected error occurred. Please try again.',
       );
       return false;
     }
@@ -121,8 +125,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Log out user
   Future<void> logout() async {
-    await _repository.logout();
-    state = AuthState.unauthenticated();
+    state = AuthState.loading();
+    try {
+      await _repository.logout();
+    } finally {
+      state = AuthState.unauthenticated();
+    }
+  }
+
+  /// Delete current user account
+  Future<bool> deleteAccount() async {
+    state = AuthState.loading();
+    try {
+      await _repository.deleteAccount();
+      state = AuthState.unauthenticated();
+      return true;
+    } on ApiException catch (e) {
+      state = AuthState.loginError(
+        message: e.message,
+        code: e.code,
+      );
+      return false;
+    } catch (e) {
+      state = AuthState.loginError(
+        message: e is Exception
+            ? e.toString().replaceAll('Exception: ', '')
+            : 'Failed to delete account. Please try again.',
+      );
+      return false;
+    }
   }
 
   /// Reset error state

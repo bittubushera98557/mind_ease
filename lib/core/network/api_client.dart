@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +11,11 @@ import '../config/app_constants.dart';
 import '../config/env_config.dart';
 import 'api_exception.dart';
 import 'api_response.dart';
+
+/// Provider for ApiClient
+final apiClientProvider = Provider<ApiClient>((ref) {
+  return ApiClient();
+});
 
 /// MindEase Centralized HTTP API Client
 class ApiClient {

@@ -22,6 +22,20 @@ import '../../features/programs/presentation/phase_quiz_screen.dart';
 import '../../features/programs/presentation/lesson_detail_screen.dart';
 import '../../features/programs/presentation/video_detail_screen.dart';
 import '../../features/support/presentation/support_options_screen.dart';
+import '../../features/profile/presentation/personal_information_screen.dart';
+import '../../features/profile/presentation/change_password_screen.dart';
+import '../../features/profile/presentation/privacy_policy_screen.dart';
+import '../../features/profile/presentation/terms_of_use_screen.dart';
+import '../../features/bookings/presentation/booking_step1_focus_screen.dart';
+import '../../features/bookings/presentation/booking_step2_date_time_screen.dart';
+import '../../features/bookings/presentation/booking_step3_review_pay_screen.dart';
+import '../../features/bookings/presentation/booking_confirmation_screen.dart';
+import '../../features/bookings/presentation/booking_detail_screen.dart';
+import '../../features/bookings/presentation/booking_pre_session_screen.dart';
+import '../../features/bookings/presentation/booking_pre_call_check_screen.dart';
+import '../../features/bookings/presentation/booking_in_session_screen.dart';
+import '../../features/bookings/presentation/booking_session_ended_screen.dart';
+import '../../features/bookings/data/models/appointment_model.dart';
 import '../../features/welcome/presentation/welcome_screen.dart';
 import 'route_names.dart';
 
@@ -113,6 +127,76 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.supportOptions,
         pageBuilder: (context, state) => _buildPage(const SupportOptionsScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.personalInformation,
+        pageBuilder: (context, state) => _buildPage(const PersonalInformationScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.changePassword,
+        pageBuilder: (context, state) => _buildPage(const ChangePasswordScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.privacyPolicy,
+        pageBuilder: (context, state) => _buildPage(const PrivacyPolicyScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.termsOfUse,
+        pageBuilder: (context, state) => _buildPage(const TermsOfUseScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.bookingFocus,
+        pageBuilder: (context, state) => _buildPage(const BookingStep1FocusScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.bookingDateTime,
+        pageBuilder: (context, state) => _buildPage(const BookingStep2DateTimeScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.bookingReviewPay,
+        pageBuilder: (context, state) => _buildPage(const BookingStep3ReviewPayScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.bookingConfirmation,
+        pageBuilder: (context, state) {
+          final appt = state.extra as AppointmentModel?;
+          return _buildPage(BookingConfirmationScreen(appointment: appt), state);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.bookingDetail,
+        pageBuilder: (context, state) {
+          final appt = state.extra as AppointmentModel?;
+          return _buildPage(BookingDetailScreen(appointment: appt), state);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.bookingPreSession,
+        pageBuilder: (context, state) {
+          final appt = state.extra as AppointmentModel?;
+          return _buildPage(BookingPreSessionScreen(appointment: appt), state);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.bookingPreCallCheck,
+        pageBuilder: (context, state) {
+          final appt = state.extra as AppointmentModel?;
+          return _buildPage(BookingPreCallCheckScreen(appointment: appt), state);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.bookingInSession,
+        pageBuilder: (context, state) {
+          final appt = state.extra as AppointmentModel?;
+          return _buildPage(BookingInSessionScreen(appointment: appt), state);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.bookingSessionEnded,
+        pageBuilder: (context, state) {
+          final appt = state.extra as AppointmentModel?;
+          return _buildPage(BookingSessionEndedScreen(appointment: appt), state);
+        },
       ),
       GoRoute(
         path: RouteNames.programDetail,

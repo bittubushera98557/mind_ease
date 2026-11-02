@@ -46,7 +46,9 @@ class ProfileScreen extends ConsumerWidget {
                       icon: Icons.person_outline_rounded,
                       title: 'Personal information',
                       subtitle: 'Name, email, password',
-                      onTap: () {},
+                      onTap: () {
+                        context.push(RouteNames.personalInformation);
+                      },
                     ),
                   ]),
                   const SizedBox(height: 24),
@@ -91,13 +93,17 @@ class ProfileScreen extends ConsumerWidget {
                     _buildListTile(
                       icon: Icons.shield_outlined,
                       title: 'Privacy policy',
-                      onTap: () {},
+                      onTap: () {
+                        context.push(RouteNames.privacyPolicy);
+                      },
                     ),
                     const Divider(height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
                     _buildListTile(
                       icon: Icons.article_outlined,
                       title: 'Terms of use',
-                      onTap: () {},
+                      onTap: () {
+                        context.push(RouteNames.termsOfUse);
+                      },
                     ),
                   ]),
                   const SizedBox(height: 12),
@@ -135,8 +141,8 @@ class ProfileScreen extends ConsumerWidget {
                       title: 'Sign out',
                       titleColor: AppColors.textPrimary,
                       onTap: () {
-                        ref.read(authNotifierProvider.notifier).logout();
                         context.go(RouteNames.signIn);
+                        ref.read(authNotifierProvider.notifier).logout();
                       },
                     ),
                   ]),
@@ -145,7 +151,9 @@ class ProfileScreen extends ConsumerWidget {
                   // Delete Account Link
                   Center(
                     child: TextButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        _showDeleteAccountConfirmationDialog(context, ref);
+                      },
                       child: Text(
                         'Delete account',
                         style: GoogleFonts.plusJakartaSans(
@@ -398,6 +406,124 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showDeleteAccountConfirmationDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        bool isDeleting = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                'Delete Account',
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              content: Text(
+                'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13.5,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          setState(() {
+                            isDeleting = true;
+                          });
+
+                          final navigator = Navigator.of(dialogContext);
+                          final scaffoldMessenger =
+                              ScaffoldMessenger.of(context);
+                          final router = GoRouter.of(context);
+
+                          final success = await ref
+                              .read(authNotifierProvider.notifier)
+                              .deleteAccount();
+
+                          try {
+                            navigator.pop();
+                          } catch (_) {}
+
+                          if (success) {
+                            router.go(RouteNames.signIn);
+                          } else {
+                            scaffoldMessenger.showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Failed to delete account. Please try again.',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD94A38),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: isDeleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          'Delete',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

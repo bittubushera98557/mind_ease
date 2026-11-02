@@ -12,14 +12,16 @@ enum AuthStatus {
 class AuthState {
   final AuthStatus status;
   final UserModel? user;
-  final String? errorMessage;
+  final String? loginErrorMessage;
+  final String? signUpErrorMessage;
   final String? errorField;
   final String? errorCode;
 
   const AuthState({
     required this.status,
     this.user,
-    this.errorMessage,
+    this.loginErrorMessage,
+    this.signUpErrorMessage,
     this.errorField,
     this.errorCode,
   });
@@ -40,14 +42,29 @@ class AuthState {
     return const AuthState(status: AuthStatus.unauthenticated);
   }
 
-  factory AuthState.error({
+  factory AuthState.loginError({
     required String message,
     String? field,
     String? code,
   }) {
     return AuthState(
       status: AuthStatus.error,
-      errorMessage: message,
+      loginErrorMessage: message,
+      signUpErrorMessage: null,
+      errorField: field,
+      errorCode: code,
+    );
+  }
+
+  factory AuthState.signUpError({
+    required String message,
+    String? field,
+    String? code,
+  }) {
+    return AuthState(
+      status: AuthStatus.error,
+      loginErrorMessage: null,
+      signUpErrorMessage: message,
       errorField: field,
       errorCode: code,
     );
@@ -56,14 +73,16 @@ class AuthState {
   AuthState copyWith({
     AuthStatus? status,
     UserModel? user,
-    String? errorMessage,
+    String? loginErrorMessage,
+    String? signUpErrorMessage,
     String? errorField,
     String? errorCode,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
-      errorMessage: errorMessage ?? this.errorMessage,
+      loginErrorMessage: loginErrorMessage ?? this.loginErrorMessage,
+      signUpErrorMessage: signUpErrorMessage ?? this.signUpErrorMessage,
       errorField: errorField ?? this.errorField,
       errorCode: errorCode ?? this.errorCode,
     );

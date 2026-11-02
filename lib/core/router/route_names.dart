@@ -20,6 +20,23 @@ class RouteNames {
   // Main Dashboard & Tab Navigation (2.01 – 2.04)
   static const String dashboard = '/dashboard';
 
+  // Profile Sub-screens
+  static const String personalInformation = '/profile/personal-information';
+  static const String changePassword = '/profile/change-password';
+  static const String privacyPolicy = '/profile/privacy-policy';
+  static const String termsOfUse = '/profile/terms-of-use';
+
+  // Booking Flow (5.01 – 5.11)
+  static const String bookingFocus = '/booking/step-1-focus';
+  static const String bookingDateTime = '/booking/step-2-date-time';
+  static const String bookingReviewPay = '/booking/step-3-review-pay';
+  static const String bookingConfirmation = '/booking/confirmation';
+  static const String bookingDetail = '/booking/detail';
+  static const String bookingPreSession = '/booking/pre-session';
+  static const String bookingPreCallCheck = '/booking/pre-call-check';
+  static const String bookingInSession = '/booking/in-session';
+  static const String bookingSessionEnded = '/booking/session-ended';
+
   // Support Options / Get Help Now
   static const String supportOptions = '/support-options';
 

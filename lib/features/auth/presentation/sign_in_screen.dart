@@ -10,6 +10,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/curved_header.dart';
 import 'providers/auth_provider.dart';
+import 'providers/auth_state.dart';
 
 /// 1.04 Sign In Screen ("Sign In To MindEase")
 class SignInScreen extends ConsumerStatefulWidget {
@@ -31,6 +32,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.initState();
     _emailController = TextEditingController(text: '');
     _passwordController = TextEditingController();
+
+    // Clear any leftover auth errors from other screens upon entering
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authNotifierProvider.notifier).clearError();
+    });
   }
 
   @override
@@ -71,7 +77,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       } else {
         final authState = ref.read(authStateProvider);
         setState(() {
-          _errorMessage = authState.errorMessage ?? 'Invalid credentials. Please try again.';
+          _errorMessage = authState.loginErrorMessage ??
+              'That email and password don\'t match. Please try again.';
         });
       }
     }
@@ -79,6 +86,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final bannerMessage = _errorMessage ??
+        (authState.status == AuthStatus.error ? authState.loginErrorMessage : null);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SingleChildScrollView(
@@ -88,6 +99,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             CurvedHeader(
               height: 140,
               onBack: () {
+                ref.read(authNotifierProvider.notifier).clearError();
                 if (context.canPop()) {
                   context.pop();
                 } else {
@@ -111,13 +123,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   const SizedBox(height: 16),
 
                   // Error / Warning Alert Banner
-                  if (_errorMessage != null) ...[
+                  if (bannerMessage != null) ...[
                     AppBanner.error(
-                      message: _errorMessage!,
+                      message: bannerMessage,
                       onClose: () {
                         setState(() {
                           _errorMessage = null;
                         });
+                        ref.read(authNotifierProvider.notifier).clearError();
                       },
                     ),
                     const SizedBox(height: 18),
@@ -130,6 +143,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     controller: _emailController,
                     prefixIcon: Icons.mail_outline_rounded,
                     keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) {
+                      if (_errorMessage != null) {
+                        setState(() {
+                          _errorMessage = null;
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(height: 14),
 
@@ -142,6 +162,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     prefixIcon: Icons.lock_outline_rounded,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _handleSignIn(),
+                    onChanged: (_) {
+                      if (_errorMessage != null) {
+                        setState(() {
+                          _errorMessage = null;
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(height: 24),
 
@@ -163,6 +190,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                       GestureDetector(
                         onTap: () {
+                          ref.read(authNotifierProvider.notifier).clearError();
                           context.pushReplacement(RouteNames.signUp);
                         },
                         child: Text(
@@ -177,6 +205,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   // "Forgot password" Link
                   GestureDetector(
                     onTap: () {
+                      ref.read(authNotifierProvider.notifier).clearError();
                       context.push(RouteNames.forgotPassword);
                     },
                     child: Text(

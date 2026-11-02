@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import '../config/env_config.dart';
@@ -83,16 +84,20 @@ class DioClient {
     }
 
     final statusCode = response.statusCode;
-    final decoded = response.data;
+    dynamic decoded = response.data;
+
+    if (decoded is String && decoded.trim().startsWith('{')) {
+      try {
+        decoded = jsonDecode(decoded);
+      } catch (_) {}
+    }
 
     String errorMessage = 'An error occurred. Please try again.';
     String? errorCode;
     String? errorField;
 
     if (decoded is Map<String, dynamic>) {
-      if (decoded.containsKey('message') && decoded['message'] != null) {
-        errorMessage = decoded['message'].toString();
-      } else if (decoded.containsKey('error') && decoded['error'] != null) {
+      if (decoded.containsKey('error') && decoded['error'] != null) {
         final err = decoded['error'];
         if (err is Map<String, dynamic>) {
           if (err.containsKey('message') && err['message'] != null) {
@@ -107,21 +112,80 @@ class DioClient {
         } else if (err is String) {
           errorMessage = err;
         }
+      } else if (decoded.containsKey('message') && decoded['message'] != null) {
+        final msg = decoded['message'];
+        if (msg is List) {
+          errorMessage = msg.join('\n');
+        } else {
+          errorMessage = msg.toString();
+        }
+      } else if (decoded.containsKey('errors') && decoded['errors'] != null) {
+        final errs = decoded['errors'];
+        if (errs is Map<String, dynamic> && errs.isNotEmpty) {
+          final firstEntry = errs.entries.first;
+          errorField = firstEntry.key;
+          if (firstEntry.value is List && (firstEntry.value as List).isNotEmpty) {
+            errorMessage = (firstEntry.value as List).first.toString();
+          } else {
+            errorMessage = firstEntry.value.toString();
+          }
+        } else if (errs is List && errs.isNotEmpty) {
+          errorMessage = errs.first.toString();
+        }
+      }
+    }
+
+    // Meaningful fallbacks if parsing didn't extract a custom message
+    if (errorMessage == 'An error occurred. Please try again.') {
+      if (statusCode == 401) {
+        errorMessage = "That email and password don't match. Please try again.";
+      } else if (statusCode == 409) {
+        errorMessage = "An account with this email already exists.";
+      } else if (statusCode == 404) {
+        errorMessage = "We couldn't find an account with that email. Check it or sign up.";
       }
     }
 
     if (statusCode == 401) {
-      return UnauthorizedException(message: errorMessage, details: decoded);
+      return UnauthorizedException(
+        message: errorMessage,
+        code: errorCode ?? 'invalid_credentials',
+        field: errorField,
+        details: decoded,
+      );
+    } else if (statusCode == 409) {
+      return ConflictException(
+        message: errorMessage,
+        code: errorCode ?? 'email_taken',
+        field: errorField ?? 'email',
+        details: decoded,
+      );
     } else if (statusCode == 404) {
-      return NotFoundException(message: errorMessage, details: decoded);
+      return NotFoundException(
+        message: errorMessage,
+        code: errorCode,
+        field: errorField,
+        details: decoded,
+      );
     } else if (statusCode == 422) {
       Map<String, dynamic>? errors;
       if (decoded is Map<String, dynamic> && decoded['errors'] is Map<String, dynamic>) {
         errors = decoded['errors'] as Map<String, dynamic>;
       }
-      return ValidationException(message: errorMessage, errors: errors);
+      return ValidationException(
+        message: errorMessage,
+        code: errorCode,
+        field: errorField,
+        errors: errors,
+      );
     } else if (statusCode != null && statusCode >= 500) {
-      return ServerException(message: errorMessage, statusCode: statusCode, details: decoded);
+      return ServerException(
+        message: errorMessage,
+        statusCode: statusCode,
+        code: errorCode,
+        field: errorField,
+        details: decoded,
+      );
     } else {
       return ApiException(
         message: errorMessage,

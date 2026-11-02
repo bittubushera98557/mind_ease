@@ -100,7 +100,37 @@ class AuthRepository {
     return null;
   }
 
+  /// Logs out the current user by sending refreshToken to API and clearing secure storage.
+  /// POST https://api.mindease.me/v1/auth/logout?refreshToken=<refreshToken>
   Future<void> logout() async {
-    await _storageService.clearAll();
+    try {
+      final refreshToken = await _storageService.getRefreshToken();
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await _dioClient.post(
+          ApiEndpoints.logout,
+          queryParameters: {
+            'refreshToken': refreshToken,
+          },
+          body: {
+            'refreshToken': refreshToken,
+          },
+        );
+      }
+    } catch (_) {
+      // Ignore API errors during logout so local storage is always cleared
+    } finally {
+      await _storageService.clearAll();
+    }
+  }
+
+  /// Deletes user account using DELETE /me (requires Bearer token) and clears secure storage.
+  Future<void> deleteAccount() async {
+    try {
+      await _dioClient.delete(
+        ApiEndpoints.currentUser,
+      );
+    } finally {
+      await _storageService.clearAll();
+    }
   }
 }

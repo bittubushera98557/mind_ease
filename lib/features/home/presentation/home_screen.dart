@@ -25,7 +25,12 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Continue where you left off
-                  _buildContinueSection(),
+                  GestureDetector(
+                      onTap : (){
+              context.push(RouteNames.phaseDetail);
+
+            },
+                       child: _buildContinueSection()),
                   const SizedBox(height: 24),
 
                   // Your Focus

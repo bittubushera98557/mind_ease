@@ -8,5 +8,18 @@ class ApiEndpoints {
   static const String verifyResetCode = '/auth/verify-code';
   static const String resetPassword = '/auth/reset-password';
   static const String logout = '/auth/logout';
-  static const String currentUser = '/auth/me';
+  static const String currentUser = '/me'; // it will be hit with bearer token
+  static const String mePoints = '/me/points'; // it will be hit with bearer token
+  static const String meAssessment = '/me/assessment'; // it will be hit with bearer token
+  static const String tokenRefresh = '/auth/refresh'; // {"refreshToken": "string" }
+  static const String bookings = '/me/bookings';
+  static const String config = '/config';
+  static const String questionnairesOnboarding = '/questionnaires/onboarding';
+  static const String programs = '/programs';
+  static const String programDetailWithId = '/programs/{programId}';
+
+  // static const String dashboard = '/panel/dashboard';
+
+  // Telehealth / Zoom Video SDK Token endpoint
+  static const String telehealthToken = '/telehealth/token';
 }

@@ -34,15 +34,46 @@ class TimeoutException extends ApiException {
 class UnauthorizedException extends ApiException {
   const UnauthorizedException({
     String message = 'Unauthorized access. Please sign in again.',
+    String? code,
+    String? field,
     dynamic details,
-  }) : super(message: message, statusCode: 401, details: details);
+  }) : super(
+          message: message,
+          statusCode: 401,
+          code: code,
+          field: field,
+          details: details,
+        );
+}
+
+class ConflictException extends ApiException {
+  const ConflictException({
+    String message = 'An account with this email already exists.',
+    String? code,
+    String? field,
+    dynamic details,
+  }) : super(
+          message: message,
+          statusCode: 409,
+          code: code,
+          field: field,
+          details: details,
+        );
 }
 
 class NotFoundException extends ApiException {
   const NotFoundException({
     String message = "We couldn't find an account with that email. Check it or sign up.",
+    String? code,
+    String? field,
     dynamic details,
-  }) : super(message: message, statusCode: 404, details: details);
+  }) : super(
+          message: message,
+          statusCode: 404,
+          code: code,
+          field: field,
+          details: details,
+        );
 }
 
 class ValidationException extends ApiException {
@@ -50,14 +81,30 @@ class ValidationException extends ApiException {
 
   const ValidationException({
     String message = 'Validation failed. Please review your input.',
+    String? code,
+    String? field,
     this.errors,
-  }) : super(message: message, statusCode: 422, details: errors);
+  }) : super(
+          message: message,
+          statusCode: 422,
+          code: code,
+          field: field,
+          details: errors,
+        );
 }
 
 class ServerException extends ApiException {
   const ServerException({
     String message = 'Internal server error occurred. Please try again later.',
     int statusCode = 500,
+    String? code,
+    String? field,
     dynamic details,
-  }) : super(message: message, statusCode: statusCode, details: details);
+  }) : super(
+          message: message,
+          statusCode: statusCode,
+          code: code,
+          field: field,
+          details: details,
+        );
 }

@@ -129,14 +129,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         final authState = ref.read(authStateProvider);
         if (authState.status == AuthStatus.error) {
           setState(() {
+            final msg = authState.signUpErrorMessage ?? 'An error occurred during registration.';
+            _bannerError = msg;
             if (authState.errorField == 'email' || authState.errorCode == 'email_taken') {
-              _emailError = authState.errorMessage;
+              _emailError = msg;
             } else if (authState.errorField == 'name') {
-              _nameError = authState.errorMessage;
+              _nameError = msg;
             } else if (authState.errorField == 'password') {
-              _passwordError = authState.errorMessage;
-            } else {
-              _bannerError = authState.errorMessage;
+              _passwordError = msg;
             }
           });
         }
@@ -148,6 +148,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final isLoading = authState.status == AuthStatus.loading;
+    final bannerMessage = _bannerError ?? (authState.status == AuthStatus.error ? authState.signUpErrorMessage : null);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -177,13 +178,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     const SizedBox(height: 20),
 
                     // Error Alert Banner
-                    if (_bannerError != null) ...[
+                    if (bannerMessage != null) ...[
                       AppBanner.error(
-                        message: _bannerError!,
+                        message: bannerMessage,
                         onClose: () {
                           setState(() {
                             _bannerError = null;
                           });
+                          ref.read(authNotifierProvider.notifier).clearError();
                         },
                       ),
                       const SizedBox(height: 18),
