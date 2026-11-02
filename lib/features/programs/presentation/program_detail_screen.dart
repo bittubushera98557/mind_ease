@@ -1,128 +1,294 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../data/models/program_detail_response_model.dart';
+import 'providers/programs_provider.dart';
 
-/// Program Detail / Overview Screen matching the design screenshots
-class ProgramDetailScreen extends StatelessWidget {
-  const ProgramDetailScreen({Key? key}) : super(key: key);
+/// Program Detail / Overview Screen matching design screenshots, dynamically bound to GET /programs/{programId}
+class ProgramDetailScreen extends ConsumerWidget {
+  final String programId;
+
+  const ProgramDetailScreen({
+    Key? key,
+    this.programId = '',
+  }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Terracotta Header with details
-            _buildHeader(context),
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (programId.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: CircularBackButton(
+              onPressed: () => context.pop(),
+            ),
+          ),
+        ),
+        body: Center(
+          child: Text(
+            'Program ID not provided',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      );
+    }
 
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20.0,
-                vertical: 20.0,
+    final detailAsync = ref.watch(programDetailProvider(programId));
+
+    return detailAsync.when(
+      loading: () => const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      ),
+      error: (err, stack) => _buildErrorState(context, ref, err.toString()),
+      data: (detail) {
+        if (!detail.isSuccess) {
+          return _buildErrorState(
+            context,
+            ref,
+            detail.error?.message ?? 'Failed to load program detail',
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: RefreshIndicator(
+            onRefresh: () async {
+              return ref.refresh(programDetailProvider(programId).future);
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Overview description paragraph
-                  Text(
-                    'Four short phases you work through in order. Each one has three lessons, three short videos, one reflection activity and a five-question quiz. Go at your own pace.',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
+                  // Terracotta Header with details
+                  _buildHeader(context, detail),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20.0,
+                      vertical: 20.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Overview description paragraph
+                        if ((detail.intro ?? detail.short).isNotEmpty)
+                          Text(
+                            detail.intro ?? detail.short,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w400,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
+                          ),
+                        if ((detail.intro ?? detail.short).isNotEmpty)
+                          const SizedBox(height: 24),
+
+                        // WHAT YOU'LL LEARN Card
+                        if (detail.learn.isNotEmpty)
+                          _buildWhatYouLearnCard(detail.learn)
+                        else
+                          _buildDefaultWhatYouLearnCard(),
+
+                        const SizedBox(height: 24),
+
+                        // Phases Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Phases',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '0 of ${detail.phases.isNotEmpty ? detail.phases.length : 4} complete',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Render phases dynamically if available
+                        if (detail.phases.isNotEmpty)
+                          ...List.generate(detail.phases.length, (index) {
+                            final phase = detail.phases[index];
+                            final isFirstOrUnlocked = index == 0;
+
+                            if (isFirstOrUnlocked) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _buildActivePhaseCard(context, phase),
+                              );
+                            } else {
+                              final prevNumber =
+                                  detail.phases[index - 1].number > 0
+                                      ? detail.phases[index - 1].number
+                                      : index;
+                              final currentNumber =
+                                  phase.number > 0 ? phase.number : index + 1;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _buildLockedPhaseCard(
+                                  context,
+                                  phase: phase,
+                                  number: currentNumber,
+                                  title: phase.title,
+                                  unlockMessage:
+                                      'Complete Phase $prevNumber to unlock Phase $currentNumber.',
+                                ),
+                              );
+                            }
+                          })
+                        else ...[
+                          _buildDefaultActivePhaseCard(context),
+                          const SizedBox(height: 12),
+                          _buildDefaultLockedPhaseCard(
+                            context,
+                            number: 2,
+                            title: 'Check Yourself, Kindly',
+                            unlockMessage:
+                                'Complete Phase 1 to unlock Phase 2.',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildDefaultLockedPhaseCard(
+                            context,
+                            number: 3,
+                            title: 'Safe to Feel, Safe to Speak',
+                            unlockMessage:
+                                'Complete Phase 2 to unlock Phase 3.',
+                          ),
+                          const SizedBox(height: 12),
+                          _buildDefaultLockedPhaseCard(
+                            context,
+                            number: 4,
+                            title: 'Mental Health First Aid',
+                            unlockMessage:
+                                'Complete Phase 3 to unlock Phase 4.',
+                          ),
+                        ],
+
+                        const SizedBox(height: 32),
+
+                        // Disclaimer
+                        Text(
+                          detail.disclaimer ??
+                              'This program is educational. It isn’t a diagnosis, a treatment, or an accredited Mental Health First Aid course.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.textTertiary,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // WHAT YOU'LL LEARN Card
-                  _buildWhatYouLearnCard(),
-
-                  const SizedBox(height: 24),
-
-                  // Phases Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Phases',
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        '0 of 4 complete',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Phase 1 (Active / Ready to start)
-                  _buildActivePhaseCard(context),
-                  const SizedBox(height: 12),
-
-                  // Phase 2 (Locked)
-                  _buildLockedPhaseCard(
-                    context,
-                    number: 2,
-                    title: 'Check Yourself, Kindly',
-                    unlockMessage: 'Complete Phase 1 to unlock Phase 2.',
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Phase 3 (Locked)
-                  _buildLockedPhaseCard(
-                    context,
-                    number: 3,
-                    title: 'Safe to Feel, Safe to Speak',
-                    unlockMessage: 'Complete Phase 2 to unlock Phase 3.',
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Phase 4 (Locked)
-                  _buildLockedPhaseCard(
-                    context,
-                    number: 4,
-                    title: 'Mental Health First Aid',
-                    unlockMessage: 'Complete Phase 3 to unlock Phase 4.',
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Disclaimer
-                  Text(
-                    'This program is educational. It isn’t a diagnosis, a treatment, or an accredited Mental Health First Aid course.',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textTertiary,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
                 ],
               ),
             ),
-          ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context, WidgetRef ref, String error) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircularBackButton(
+            onPressed: () => context.pop(),
+          ),
+        ),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: AppColors.alertErrorIcon,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  ref.invalidate(programDetailProvider(programId));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, ProgramDetailResponseModel detail) {
+    int totalPts = 0;
+    for (var phase in detail.phases) {
+      if (phase.pointsAwarded != null) {
+        totalPts += phase.pointsAwarded!;
+      }
+    }
+
+    final activePhaseNumber = detail.phases.isNotEmpty && detail.phases.first.number > 0
+        ? detail.phases.first.number
+        : 1;
+
+    final title = detail.title.isNotEmpty
+        ? detail.title
+        : 'Mental Health First Aid\nSelf-Reflection Program';
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -138,7 +304,7 @@ class ProgramDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top bar: Back button & 0 pts badge
+          // Top bar: Back button & pts badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -165,7 +331,7 @@ class ProgramDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      '0 pts',
+                      '$totalPts pts',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -190,7 +356,7 @@ class ProgramDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Mental Health First Aid\nSelf-Reflection Program',
+            title,
             style: GoogleFonts.outfit(
               fontSize: 24,
               fontWeight: FontWeight.w800,
@@ -205,7 +371,7 @@ class ProgramDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Currently on Phase 1',
+                'Currently on Phase $activePhaseNumber',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -237,7 +403,7 @@ class ProgramDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWhatYouLearnCard() {
+  Widget _buildWhatYouLearnCard(List<String> learnItems) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -258,22 +424,22 @@ class ProgramDetailScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _bulletPoint(
-            'What mental health is and how it shows up in your body, thoughts and habits',
-          ),
-          const SizedBox(height: 10),
-          _bulletPoint('How to spot early changes in yourself and others'),
-          const SizedBox(height: 10),
-          _bulletPoint(
-            'Why feelings get hidden, and safer ways to express them',
-          ),
-          const SizedBox(height: 10),
-          _bulletPoint(
-            'How to check in with someone and connect them to support',
-          ),
+          ...learnItems.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: _bulletPoint(item),
+              )),
         ],
       ),
     );
+  }
+
+  Widget _buildDefaultWhatYouLearnCard() {
+    return _buildWhatYouLearnCard(const [
+      'What mental health is and how it shows up in your body, thoughts and habits',
+      'How to spot early changes in yourself and others',
+      'Why feelings get hidden, and safer ways to express them',
+      'How to check in with someone and connect them to support',
+    ]);
   }
 
   Widget _bulletPoint(String text) {
@@ -300,9 +466,16 @@ class ProgramDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActivePhaseCard(BuildContext context) {
+  Widget _buildActivePhaseCard(BuildContext context, ProgramPhaseModel phase) {
+    final phaseNum = phase.number > 0 ? phase.number : 1;
+    final totalItems = phase.lessons.length +
+        phase.videos.length +
+        (phase.activity != null ? 1 : 0) +
+        (phase.quiz != null ? 1 : 0);
+    final totalDisplay = totalItems > 0 ? totalItems : 8;
+
     return GestureDetector(
-      onTap: () => context.push(RouteNames.phaseDetail),
+      onTap: () => context.push(RouteNames.phaseDetail, extra: phase),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
@@ -329,10 +502,10 @@ class ProgramDetailScreen extends StatelessWidget {
                     color: Color(0xFF88A75E),
                     shape: BoxShape.circle,
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      '1',
-                      style: TextStyle(
+                      '$phaseNum',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -348,7 +521,7 @@ class ProgramDetailScreen extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
-                        'PHASE 1',
+                        'PHASE $phaseNum',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -399,7 +572,7 @@ class ProgramDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              "How's Your Head, Really?",
+              phase.title.isNotEmpty ? phase.title : "How's Your Head, Really?",
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -408,7 +581,7 @@ class ProgramDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '0 of 8 items done',
+              '0 of $totalDisplay items done',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
@@ -433,14 +606,25 @@ class ProgramDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildDefaultActivePhaseCard(BuildContext context) {
+    return _buildActivePhaseCard(
+      context,
+      const ProgramPhaseModel(
+        number: 1,
+        title: "How's Your Head, Really?",
+      ),
+    );
+  }
+
   Widget _buildLockedPhaseCard(
     BuildContext context, {
+    ProgramPhaseModel? phase,
     required int number,
     required String title,
     required String unlockMessage,
   }) {
     return GestureDetector(
-      onTap: () => context.push(RouteNames.phaseDetail),
+      onTap: () => context.push(RouteNames.phaseDetail, extra: phase),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
@@ -544,6 +728,20 @@ class ProgramDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDefaultLockedPhaseCard(
+    BuildContext context, {
+    required int number,
+    required String title,
+    required String unlockMessage,
+  }) {
+    return _buildLockedPhaseCard(
+      context,
+      number: number,
+      title: title,
+      unlockMessage: unlockMessage,
     );
   }
 }

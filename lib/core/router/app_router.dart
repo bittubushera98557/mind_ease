@@ -13,6 +13,7 @@ import '../../features/questionnaire/presentation/questionnaire_next_steps_scree
 import '../../features/questionnaire/presentation/questionnaire_results_screen.dart';
 import '../../features/questionnaire/presentation/questionnaire_survey_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/programs/data/models/program_detail_response_model.dart';
 import '../../features/programs/presentation/program_detail_screen.dart';
 import '../../features/programs/presentation/phase_detail_screen.dart';
 import '../../features/programs/presentation/phase_learn_screen.dart';
@@ -200,15 +201,55 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.programDetail,
-        pageBuilder: (context, state) => _buildPage(const ProgramDetailScreen(), state),
+        pageBuilder: (context, state) {
+          final programId = state.extra as String? ?? '';
+          return _buildPage(ProgramDetailScreen(programId: programId), state);
+        },
       ),
       GoRoute(
         path: RouteNames.phaseDetail,
-        pageBuilder: (context, state) => _buildPage(const PhaseDetailScreen(), state),
+        pageBuilder: (context, state) {
+          final phase = state.extra as ProgramPhaseModel?;
+          return _buildPage(
+            PhaseDetailScreen(
+              phase: phase,
+              phaseNumber: phase?.number ?? 1,
+              phaseTitle: phase?.title.isNotEmpty == true
+                  ? phase!.title
+                  : "How's Your Head, Really?",
+            ),
+            state,
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.phaseLearn,
-        pageBuilder: (context, state) => _buildPage(const PhaseLearnScreen(), state),
+        pageBuilder: (context, state) {
+          List<PhaseLessonModel>? lessons;
+          int phaseNumber = 1;
+          if (state.extra is List<PhaseLessonModel>) {
+            lessons = state.extra as List<PhaseLessonModel>;
+          } else if (state.extra is ProgramPhaseModel) {
+            final phase = state.extra as ProgramPhaseModel;
+            lessons = phase.lessons;
+            if (phase.number > 0) phaseNumber = phase.number;
+          } else if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            if (map['lessons'] is List<PhaseLessonModel>) {
+              lessons = map['lessons'] as List<PhaseLessonModel>;
+            }
+            if (map['phaseNumber'] is int) {
+              phaseNumber = map['phaseNumber'] as int;
+            }
+          }
+          return _buildPage(
+            PhaseLearnScreen(
+              lessons: lessons,
+              phaseNumber: phaseNumber,
+            ),
+            state,
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.phaseWatch,
@@ -224,7 +265,33 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.lessonDetail,
-        pageBuilder: (context, state) => _buildPage(const LessonDetailScreen(), state),
+        pageBuilder: (context, state) {
+          PhaseLessonModel? lesson;
+          int lessonNumber = 1;
+          int totalLessons = 3;
+          if (state.extra is PhaseLessonModel) {
+            lesson = state.extra as PhaseLessonModel;
+          } else if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            if (map['lesson'] is PhaseLessonModel) {
+              lesson = map['lesson'] as PhaseLessonModel;
+            }
+            if (map['lessonNumber'] is int) {
+              lessonNumber = map['lessonNumber'] as int;
+            }
+            if (map['totalLessons'] is int) {
+              totalLessons = map['totalLessons'] as int;
+            }
+          }
+          return _buildPage(
+            LessonDetailScreen(
+              lesson: lesson,
+              lessonNumber: lessonNumber,
+              totalLessons: totalLessons,
+            ),
+            state,
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.videoDetail,

@@ -1,50 +1,111 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
+import '../data/models/program_response_model.dart';
+import 'providers/programs_provider.dart';
 
 /// 2.02 My Programs Screen
-class ProgramsScreen extends StatelessWidget {
+class ProgramsScreen extends ConsumerWidget {
   const ProgramsScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final programsAsync = ref.watch(programsListProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(context),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          return ref.refresh(programsListProvider.future);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          child: Column(
+            children: [
+              // Header
+              _buildHeader(context),
 
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8),
 
-                  // Recommended Program Card
-                  _buildProgramCard(context),
+                    // Dynamic Programs List from API
+                    programsAsync.when(
+                      data: (response) {
+                        if (response.error != null) {
+                          return _buildErrorCard(
+                            context,
+                            ref,
+                            response.error!.message.isNotEmpty
+                                ? response.error!.message
+                                : 'Failed to load programs.',
+                          );
+                        }
 
-                  const SizedBox(height: 32),
+                        final programs = response.programs;
+                        if (programs.isEmpty) {
+                          return _buildEmptyState();
+                        }
 
-                  // Footer Text
-                  Text(
-                    'More programs will appear here as they are published.',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textTertiary,
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: programs.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 20),
+                          itemBuilder: (context, index) {
+                            final program = programs[index];
+                            return _buildDynamicProgramCard(
+                              context,
+                              program,
+                              isRecommended: index == 0,
+                            );
+                          },
+                        );
+                      },
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40.0),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      error: (err, stack) => _buildErrorCard(
+                        context,
+                        ref,
+                        err.toString().replaceAll('Exception: ', ''),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                ],
+
+                    const SizedBox(height: 32),
+
+                    // Footer Text
+                    Text(
+                      'More programs will appear here as they are published.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.textTertiary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -88,7 +149,14 @@ class ProgramsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProgramCard(BuildContext context) {
+  Widget _buildDynamicProgramCard(
+    BuildContext context,
+    ProgramItemModel program, {
+    bool isRecommended = false,
+  }) {
+    final statusText =
+        program.status.isNotEmpty ? program.status.toUpperCase() : 'ACTIVE';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -106,7 +174,7 @@ class ProgramsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Recommended Pill Tag
+          // Tag Pill (Recommended / Status)
           Align(
             alignment: Alignment.centerRight,
             child: Container(
@@ -116,7 +184,7 @@ class ProgramsScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Recommended',
+                isRecommended ? 'Recommended' : statusText,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -130,7 +198,7 @@ class ProgramsScreen extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Circular Progress Ring Icon
+              // Circular Icon
               Container(
                 width: 52,
                 height: 52,
@@ -142,14 +210,16 @@ class ProgramsScreen extends StatelessWidget {
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 44,
                         height: 44,
                         child: CircularProgressIndicator(
                           value: 0.37,
                           strokeWidth: 3,
-                          backgroundColor: Color(0xFFE8E2DA),
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          backgroundColor: const Color(0xFFE8E2DA),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary,
+                          ),
                         ),
                       ),
                       Icon(
@@ -164,7 +234,9 @@ class ProgramsScreen extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'Mental Health First Aid Self-Reflection Program',
+                  program.title.isNotEmpty
+                      ? program.title
+                      : 'Mental Health Self-Reflection Program',
                   style: GoogleFonts.outfit(
                     fontSize: 16.5,
                     fontWeight: FontWeight.w700,
@@ -178,16 +250,18 @@ class ProgramsScreen extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Description
-          Text(
-            'Understand your mental health, notice the signs, and learn how to support yourself and others.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
-              height: 1.45,
+          if (program.short.isNotEmpty) ...[
+            Text(
+              program.short,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
 
           // Meta Row
           Text(
@@ -239,7 +313,10 @@ class ProgramsScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => context.push(RouteNames.programDetail),
+                  onPressed: () => context.push(
+                    RouteNames.programDetail,
+                    extra: program.id,
+                  ),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.inputBorder),
                     shape: RoundedRectangleBorder(
@@ -280,6 +357,93 @@ class ProgramsScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(
+              Icons.format_list_bulleted_rounded,
+              size: 40,
+              color: AppColors.textTertiary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No programs published yet',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Check back soon for new learning programs.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorCard(BuildContext context, WidgetRef ref, String message) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFCEBE8)),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 36,
+            color: Color(0xFFD94A38),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => ref.refresh(programsListProvider),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: Text(
+              'Retry',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),

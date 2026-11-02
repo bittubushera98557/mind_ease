@@ -1,23 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../data/models/program_detail_response_model.dart';
 
-/// Phase Detail Screen matching the design screenshots
+/// Phase Detail Screen dynamically rendering phase data from GET /programs/{programId}
 class PhaseDetailScreen extends StatelessWidget {
+  final ProgramPhaseModel? phase;
   final int phaseNumber;
   final String phaseTitle;
 
   const PhaseDetailScreen({
     Key? key,
+    this.phase,
     this.phaseNumber = 1,
     this.phaseTitle = "How's Your Head, Really?",
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final effectiveNumber = phase?.number != null && phase!.number > 0
+        ? phase!.number
+        : phaseNumber;
+    final effectiveTitle = phase?.title.isNotEmpty == true
+        ? phase!.title
+        : phaseTitle;
+
+    final description = phase?.description.isNotEmpty == true
+        ? phase!.description
+        : 'Learn what mental health really means and how it shows up in your body, thoughts, and habits. Start noticing what supports your wellbeing and what makes things harder.';
+
+    final lessons = phase?.lessons ?? [];
+    final videos = phase?.videos ?? [];
+    final activity = phase?.activity;
+    final quiz = phase?.quiz;
+
+    final lessonsCount = lessons.isNotEmpty ? lessons.length : 3;
+    final videosCount = videos.isNotEmpty ? videos.length : 3;
+    final activityCount = activity != null ? 1 : 1;
+    final quizCount = quiz?.questions.isNotEmpty == true ? quiz!.questions.length : 5;
+
+    final totalItems = lessonsCount + videosCount + (activity != null ? 1 : 1) + (quiz != null ? 1 : 1);
+    final objectives = phase?.objectives.isNotEmpty == true
+        ? phase!.objectives
+        : const [
+            'Describe mental health as part of whole-person health',
+            'Place yourself on the mental health continuum',
+            'Name things that support and strain your wellbeing',
+          ];
+
+    final points = phase?.pointsAwarded ?? 100;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SingleChildScrollView(
@@ -26,7 +62,12 @@ class PhaseDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Terracotta Header
-            _buildHeader(context),
+            _buildHeader(
+              context,
+              number: effectiveNumber,
+              title: effectiveTitle,
+              totalItems: totalItems,
+            ),
 
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -38,7 +79,7 @@ class PhaseDetailScreen extends StatelessWidget {
                 children: [
                   // Subtitle / Intro paragraph
                   Text(
-                    'Learn what mental health really means and how it shows up in your body, thoughts, and habits. Start noticing what supports your wellbeing and what makes things harder.',
+                    description,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w400,
@@ -49,7 +90,7 @@ class PhaseDetailScreen extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // Up Next Card
-                  _buildUpNextCard(),
+                  _buildUpNextCard(context, lessons),
                   const SizedBox(height: 16),
 
                   // 2x2 Grid of Content Items (Learn, Watch, Activity, Quiz)
@@ -61,10 +102,16 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconColor: const Color(0xFF6B9A5E),
                           iconBgColor: const Color(0xFFDFEEDF),
                           title: 'Learn',
-                          subtitle: '3 lessons',
-                          progress: '0 of 3 read',
+                          subtitle: '$lessonsCount lessons',
+                          progress: '0 of $lessonsCount read',
                           isHighlighted: true,
-                          onTap: () => context.push(RouteNames.phaseLearn),
+                          onTap: () => context.push(
+                            RouteNames.phaseLearn,
+                            extra: {
+                              'lessons': lessons,
+                              'phaseNumber': effectiveNumber,
+                            },
+                          ),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -74,10 +121,16 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconColor: const Color(0xFFC76B55),
                           iconBgColor: const Color(0xFFFDF1EE),
                           title: 'Watch',
-                          subtitle: '3 videos',
-                          progress: '0 of 3 watched',
+                          subtitle: '$videosCount videos',
+                          progress: '0 of $videosCount watched',
                           isHighlighted: false,
-                          onTap: () => context.push(RouteNames.phaseWatch),
+                          onTap: () => context.push(
+                            RouteNames.phaseWatch,
+                            extra: {
+                              'videos': videos,
+                              'phaseNumber': effectiveNumber,
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -91,10 +144,16 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconColor: const Color(0xFF7C6BC6),
                           iconBgColor: const Color(0xFFEDE9FB),
                           title: 'Activity',
-                          subtitle: '1 activity',
+                          subtitle: '$activityCount activity',
                           progress: 'Not started',
                           isHighlighted: false,
-                          onTap: () => context.push(RouteNames.phaseActivity),
+                          onTap: () => context.push(
+                            RouteNames.phaseActivity,
+                            extra: {
+                              'activity': activity,
+                              'phaseNumber': effectiveNumber,
+                            },
+                          ),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -104,10 +163,16 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconColor: const Color(0xFFD49A3E),
                           iconBgColor: const Color(0xFFFFF8DC),
                           title: 'Quiz',
-                          subtitle: '5 questions',
-                          progress: 'Pass mark 80%',
+                          subtitle: '$quizCount questions',
+                          progress: 'Pass mark ${quiz?.passThreshold ?? 80}%',
                           isHighlighted: false,
-                          onTap: () => context.push(RouteNames.phaseQuiz),
+                          onTap: () => context.push(
+                            RouteNames.phaseQuiz,
+                            extra: {
+                              'quiz': quiz,
+                              'phaseNumber': effectiveNumber,
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -115,11 +180,11 @@ class PhaseDetailScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // IN THIS PHASE YOU'LL Card
-                  _buildYouWillLearnCard(),
+                  _buildYouWillLearnCard(objectives),
                   const SizedBox(height: 16),
 
                   // Completion Reward Card
-                  _buildRewardCard(),
+                  _buildRewardCard(points, effectiveNumber),
 
                   const SizedBox(height: 40),
                 ],
@@ -131,7 +196,12 @@ class PhaseDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(
+    BuildContext context, {
+    required int number,
+    required String title,
+    required int totalItems,
+  }) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -178,7 +248,7 @@ class PhaseDetailScreen extends StatelessWidget {
           const SizedBox(height: 18),
 
           Text(
-            'PHASE $phaseNumber OF 4',
+            'PHASE $number OF 4',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -188,7 +258,7 @@ class PhaseDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            phaseTitle,
+            title,
             style: GoogleFonts.outfit(
               fontSize: 26,
               fontWeight: FontWeight.w800,
@@ -203,7 +273,7 @@ class PhaseDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '0 of 8 items done',
+                '0 of $totalItems items done',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -235,55 +305,65 @@ class PhaseDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUpNextCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary, width: 1.5),
+  Widget _buildUpNextCard(BuildContext context, List<PhaseLessonModel> lessons) {
+    final nextLessonTitle = lessons.isNotEmpty
+        ? 'Lesson: ${lessons.first.title}'
+        : 'Lesson: Mental Health Isn\'t Just Mental';
+
+    return GestureDetector(
+      onTap: () => context.push(
+        RouteNames.phaseLearn,
+        extra: lessons.isNotEmpty ? lessons.first : null,
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
-            child: const Icon(
-              Icons.arrow_forward_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Up next',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Up next',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Lesson: Mental Health Isn\'t Just Mental',
-                  style: GoogleFonts.outfit(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                  const SizedBox(height: 2),
+                  Text(
+                    nextLessonTitle,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -362,7 +442,7 @@ class PhaseDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildYouWillLearnCard() {
+  Widget _buildYouWillLearnCard(List<String> objectives) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -383,11 +463,12 @@ class PhaseDetailScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _bulletPoint('Describe mental health as part of whole-person health'),
-          const SizedBox(height: 10),
-          _bulletPoint('Place yourself on the mental health continuum'),
-          const SizedBox(height: 10),
-          _bulletPoint('Name things that support and strain your wellbeing'),
+          ...objectives.map(
+            (objective) => Padding(
+              padding: const EdgeInsets.only(bottom: 10.0),
+              child: _bulletPoint(objective),
+            ),
+          ),
         ],
       ),
     );
@@ -417,7 +498,8 @@ class PhaseDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRewardCard() {
+  Widget _buildRewardCard(int points, int currentPhaseNumber) {
+    final nextPhaseNum = currentPhaseNumber + 1;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -436,7 +518,7 @@ class PhaseDetailScreen extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Finish all lessons, videos, the activity and pass the quiz to complete this phase and earn 100 points. This unlocks Phase 2.',
+              'Finish all lessons, videos, the activity and pass the quiz to complete this phase and earn $points points. This unlocks Phase $nextPhaseNum.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w400,

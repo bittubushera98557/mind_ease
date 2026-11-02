@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../data/models/program_detail_response_model.dart';
 
-/// Phase Learn Screen matching the design screenshot
+/// Phase Learn Screen dynamically displaying phase lessons
 class PhaseLearnScreen extends StatelessWidget {
-  const PhaseLearnScreen({Key? key}) : super(key: key);
+  final List<PhaseLessonModel>? lessons;
+  final int phaseNumber;
 
-  static const List<_LessonData> _lessons = [
+  const PhaseLearnScreen({
+    Key? key,
+    this.lessons,
+    this.phaseNumber = 1,
+  }) : super(key: key);
+
+  static const List<_LessonData> _defaultLessons = [
     _LessonData(
       number: 1,
       duration: '4 min read',
@@ -33,6 +42,9 @@ class PhaseLearnScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasDynamicLessons = lessons != null && lessons!.isNotEmpty;
+    final totalLessons = hasDynamicLessons ? lessons!.length : _defaultLessons.length;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -45,18 +57,18 @@ class PhaseLearnScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top bar: Back button & "PHASE 1 - LEARN" label
+              // Top bar: Back button & "PHASE X - LEARN" label
               Row(
                 children: [
                   CircularBackButton(
                     isLightOnDark: false,
                     onPressed: () => context.pop(),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'PHASE 1 - LEARN',
-                        style: TextStyle(
+                        'PHASE $phaseNumber - LEARN',
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.4,
@@ -82,7 +94,7 @@ class PhaseLearnScreen extends StatelessWidget {
 
               // Description
               Text(
-                '0 of 3 lessons read. Open a lesson and mark it complete at the end.',
+                '0 of $totalLessons lessons read. Open a lesson and mark it complete at the end.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w400,
@@ -93,16 +105,121 @@ class PhaseLearnScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Lesson Cards
-              ..._lessons.map(
-                (lesson) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildLessonCard(context, lesson),
+              if (hasDynamicLessons)
+                ...List.generate(lessons!.length, (index) {
+                  final lesson = lessons![index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildDynamicLessonCard(
+                      context,
+                      lesson,
+                      index + 1,
+                      lessons!.length,
+                    ),
+                  );
+                })
+              else
+                ..._defaultLessons.map(
+                  (lesson) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildLessonCard(context, lesson),
+                  ),
                 ),
-              ),
 
               const SizedBox(height: 32),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDynamicLessonCard(
+    BuildContext context,
+    PhaseLessonModel lesson,
+    int lessonNumber,
+    int totalLessons,
+  ) {
+    final durationStr = lesson.minutes > 0 ? '${lesson.minutes} min read' : '4 min read';
+    return GestureDetector(
+      onTap: () => context.push(
+        RouteNames.lessonDetail,
+        extra: {
+          'lesson': lesson,
+          'lessonNumber': lessonNumber,
+          'totalLessons': totalLessons,
+        },
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.inputBorder),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x05000000),
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Radio / Checkbox circle
+            Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.inputBorder, width: 1.5),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Lesson info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Lesson $lessonNumber \u00b7 $durationStr',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    lesson.title,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Not started',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Chevron arrow
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textTertiary,
+              size: 22,
+            ),
+          ],
         ),
       ),
     );

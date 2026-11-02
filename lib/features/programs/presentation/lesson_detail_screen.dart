@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../data/models/program_detail_response_model.dart';
 
-/// Lesson Detail Screen matching the design screenshots
+/// Lesson Detail Screen dynamically rendering lesson content
 class LessonDetailScreen extends StatelessWidget {
+  final PhaseLessonModel? lesson;
   final int lessonNumber;
   final int totalLessons;
   final String lessonTitle;
@@ -14,6 +17,7 @@ class LessonDetailScreen extends StatelessWidget {
 
   const LessonDetailScreen({
     Key? key,
+    this.lesson,
     this.lessonNumber = 1,
     this.totalLessons = 3,
     this.lessonTitle = "Mental Health Isn't Just Mental",
@@ -22,17 +26,28 @@ class LessonDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveTitle = lesson?.title.isNotEmpty == true
+        ? lesson!.title
+        : lessonTitle;
+    final effectiveDuration = lesson?.minutes != null && lesson!.minutes > 0
+        ? '${lesson!.minutes} min read'
+        : duration;
+    final introText = lesson?.intro ??
+        'Mental health is how we think, feel and act. It affects how we handle stress, connect with people and make choices. And it doesn\'t stay in your head.';
+
+    final hasSections = lesson?.sections != null && lesson!.sections.isNotEmpty;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
             // Top progress bar
-            const LinearProgressIndicator(
-              value: 0.33,
+            LinearProgressIndicator(
+              value: totalLessons > 0 ? (lessonNumber / totalLessons) : 0.33,
               minHeight: 3,
-              backgroundColor: Color(0xFFE8E2DA),
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              backgroundColor: const Color(0xFFE8E2DA),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
             ),
 
             // Top bar
@@ -92,41 +107,11 @@ class LessonDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Draft copy & duration tag
+                    // Duration tag
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3CD),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.edit_outlined,
-                                size: 12,
-                                color: Color(0xFF856404),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'DRAFT COPY',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF856404),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
                         Text(
-                          duration,
+                          effectiveDuration,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
@@ -139,7 +124,7 @@ class LessonDetailScreen extends StatelessWidget {
 
                     // Title
                     Text(
-                      lessonTitle,
+                      effectiveTitle,
                       style: GoogleFonts.outfit(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
@@ -151,7 +136,7 @@ class LessonDetailScreen extends StatelessWidget {
 
                     // Intro paragraph
                     Text(
-                      'Mental health is how we think, feel and act. It affects how we handle stress, connect with people and make choices. And it doesn\'t stay in your head.',
+                      introText,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w400,
@@ -161,129 +146,54 @@ class LessonDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    // Heading: It shows up in three places
-                    Text(
-                      'It shows up in three places',
-                      style: GoogleFonts.outfit(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                    // Dynamic Sections or Fallback
+                    if (hasSections) ...[
+                      ...lesson!.sections.map((section) => _buildSection(section)),
+                    ] else ...[
+                      Text(
+                        'It shows up in three places',
+                        style: GoogleFonts.outfit(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "When your mental health shifts, you'll usually notice it somewhere first:",
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textSecondary,
-                        height: 1.5,
+                      const SizedBox(height: 8),
+                      Text(
+                        "When your mental health shifts, you'll usually notice it somewhere first:",
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
+                      const SizedBox(height: 14),
+                      _bulletPoint("Your body: sleep, energy, appetite, tension, headaches"),
+                      const SizedBox(height: 10),
+                      _bulletPoint("Your thoughts: focus, worry, the way you talk to yourself"),
+                      const SizedBox(height: 10),
+                      _bulletPoint("Your habits: how you spend time, who you see, how you switch off"),
+                    ],
 
-                    // Bullet points
-                    _bulletPoint(
-                      "Your body: sleep, energy, appetite, tension, headaches",
-                    ),
-                    const SizedBox(height: 10),
-                    _bulletPoint(
-                      "Your thoughts: focus, worry, the way you talk to yourself",
-                    ),
-                    const SizedBox(height: 10),
-                    _bulletPoint(
-                      "Your habits: how you spend time, who you see, how you switch off",
-                    ),
-                    const SizedBox(height: 28),
-
-                    // Heading: Everyone has mental health
-                    Text(
-                      'Everyone has mental health',
-                      style: GoogleFonts.outfit(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Just like physical health, everyone has mental health. It isn\'t the same as having a mental illness. It changes over time, with good stretches and harder ones.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textSecondary,
-                        height: 1.6,
-                      ),
-                    ),
                     const SizedBox(height: 24),
 
                     // Real-World Example Card
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.inputBorder),
+                    if (lesson?.example != null && lesson!.example!.isNotEmpty)
+                      _buildExampleCard(lesson!.example!)
+                    else
+                      _buildExampleCard(
+                        "During a busy month at work, Sam sleeps badly, skips the gym and snaps at his housemate. None of that makes him a bad person. It's his mental health showing up in his body and habits.",
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'REAL-WORLD EXAMPLE',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'During a busy month at work, Sam sleeps badly, skips the gym and snaps at his housemate. None of that makes him a bad person. It\'s his mental health showing up in his body and habits.',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.textSecondary,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 16),
 
-                    // Key Takeaway Card (Dark)
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4A3525),
-                        borderRadius: BorderRadius.circular(16),
+                    // Key Takeaway Card
+                    if (lesson?.takeaway != null && lesson!.takeaway!.isNotEmpty)
+                      _buildTakeawayCard(lesson!.takeaway!)
+                    else
+                      _buildTakeawayCard(
+                        "Mental health is part of your overall health. Noticing it in your body and habits is the first skill.",
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'KEY TAKEAWAY',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                              color: Colors.white.withOpacity(0.7),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Mental health is part of your overall health. Noticing it in your body and habits is the first skill.',
-                            style: GoogleFonts.outfit(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -293,7 +203,7 @@ class LessonDetailScreen extends StatelessWidget {
             // Bottom Action Buttons
             Container(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.background,
                 border: Border(
                   top: BorderSide(color: AppColors.inputBorder, width: 0.5),
@@ -308,44 +218,121 @@ class LessonDetailScreen extends StatelessWidget {
                       context.pop();
                     },
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.inputBorder),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Next lesson',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            size: 20,
-                            color: AppColors.textPrimary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSection(PhaseLessonSectionModel section) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (section.h != null && section.h!.isNotEmpty) ...[
+          Text(
+            section.h!,
+            style: GoogleFonts.outfit(
+              fontSize: 19,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        ...section.p.map(
+          (para) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Text(
+              para,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ),
+        if (section.list.isNotEmpty) const SizedBox(height: 6),
+        ...section.list.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: _bulletPoint(item),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildExampleCard(String exampleText) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'REAL-WORLD EXAMPLE',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            exampleText,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w400,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTakeawayCard(String takeawayText) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF4A3525),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'KEY TAKEAWAY',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: Colors.white.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            takeawayText,
+            style: GoogleFonts.outfit(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }

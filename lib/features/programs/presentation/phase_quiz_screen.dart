@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../data/models/program_detail_response_model.dart';
 
 enum _QuizScreenMode { intro, question, results }
 
@@ -25,12 +27,14 @@ class _QuizQuestionData {
   });
 }
 
-/// Phase Quiz Screen matching all 5 design screenshots dynamically
+/// Phase Quiz Screen dynamically rendering phase quiz from GET /programs/{programId}
 class PhaseQuizScreen extends StatefulWidget {
+  final PhaseQuizModel? quiz;
   final int phaseNumber;
 
   const PhaseQuizScreen({
     Key? key,
+    this.quiz,
     this.phaseNumber = 1,
   }) : super(key: key);
 
@@ -46,7 +50,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   int _score = 0;
   int _attemptsCount = 0;
 
-  static const List<_QuizQuestionData> _questionsBank = [
+  static const List<_QuizQuestionData> _defaultQuestionsBank = [
     _QuizQuestionData(
       number: 1,
       question: 'Which statement best describes mental health?',
@@ -124,6 +128,30 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
     ),
   ];
 
+  List<_QuizQuestionData> get _questions {
+    if (widget.quiz != null && widget.quiz!.questions.isNotEmpty) {
+      return widget.quiz!.questions.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final q = entry.value;
+        return _QuizQuestionData(
+          number: idx + 1,
+          question: q.q,
+          options: q.options,
+          correctIndex: q.answer,
+          feedbackCorrect: q.explain?.isNotEmpty == true
+              ? q.explain!
+              : 'Great job! You selected the correct answer.',
+          feedbackIncorrect: q.explain?.isNotEmpty == true
+              ? q.explain!
+              : 'Not quite right. Take another look at the phase material.',
+        );
+      }).toList();
+    }
+    return _defaultQuestionsBank;
+  }
+
+  int get _passThresholdPercentage => widget.quiz?.passThreshold ?? 80;
+
   void _startQuiz() {
     setState(() {
       _mode = _QuizScreenMode.question;
@@ -137,7 +165,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   void _submitAnswer() {
     if (_selectedOptionIndex == null || _isSubmitted) return;
 
-    final q = _questionsBank[_currentQuestionIndex];
+    final q = _questions[_currentQuestionIndex];
     final isCorrect = _selectedOptionIndex == q.correctIndex;
 
     setState(() {
@@ -149,7 +177,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   }
 
   void _nextQuestion() {
-    if (_currentQuestionIndex < _questionsBank.length - 1) {
+    if (_currentQuestionIndex < _questions.length - 1) {
       setState(() {
         _currentQuestionIndex++;
         _selectedOptionIndex = null;
@@ -192,6 +220,9 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   // 1. INTRO SCREEN
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildIntroScreen() {
+    final questionsList = _questions;
+    final passMarkNeeded = ((_passThresholdPercentage / 100) * questionsList.length).ceil();
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
@@ -250,7 +281,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
           const SizedBox(height: 8),
 
           Text(
-            '5 questions on what you\'ve covered in this phase. You\'ll see feedback after each answer.',
+            '${questionsList.length} questions on what you\'ve covered in this phase. You\'ll see feedback after each answer.',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 13.5,
               fontWeight: FontWeight.w400,
@@ -276,45 +307,17 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
             ),
             child: Column(
               children: [
-                _buildStatRow('Questions', '${_questionsBank.length}'),
+                _buildStatRow('Questions', '${questionsList.length}'),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
                 ),
-                _buildStatRow('Pass mark', '80% (4 of 5)'),
+                _buildStatRow('Pass mark', '$_passThresholdPercentage% ($passMarkNeeded of ${questionsList.length})'),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
                 ),
                 _buildStatRow('Attempts so far', '$_attemptsCount'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3CD),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.edit_outlined,
-                  size: 12,
-                  color: Color(0xFF856404),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'DRAFT QUESTIONS',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF856404),
-                  ),
-                ),
               ],
             ),
           ),
@@ -334,8 +337,9 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   // 2. ACTIVE QUESTION SCREEN
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildQuestionScreen() {
-    final q = _questionsBank[_currentQuestionIndex];
-    final total = _questionsBank.length;
+    final questionsList = _questions;
+    final q = questionsList[_currentQuestionIndex];
+    final total = questionsList.length;
     final progressVal = (_currentQuestionIndex + 1) / total;
 
     return Column(
@@ -471,7 +475,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   }
 
   Widget _buildOptionCard(_QuizQuestionData q, int optIdx) {
-    final letters = ['A', 'B', 'C', 'D'];
+    final letters = ['A', 'B', 'C', 'D', 'E', 'F'];
     final optionText = q.options[optIdx];
     final isSelected = _selectedOptionIndex == optIdx;
     final isCorrect = optIdx == q.correctIndex;
@@ -487,7 +491,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
       ),
       child: Center(
         child: Text(
-          letters[optIdx],
+          optIdx < letters.length ? letters[optIdx] : '${optIdx + 1}',
           style: GoogleFonts.outfit(
             fontSize: 13,
             fontWeight: FontWeight.w700,
@@ -503,7 +507,6 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
         bgColor = AppColors.primary.withOpacity(0.04);
       }
     } else {
-      // Submitted state
       if (isCorrect) {
         borderColor = const Color(0xFF7CA95B);
         bgColor = const Color(0xFFF1F8EE);
@@ -618,9 +621,10 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   // 3. RESULTS SCREEN
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildResultsScreen() {
-    final total = _questionsBank.length;
+    final questionsList = _questions;
+    final total = questionsList.length;
     final percentage = ((_score / total) * 100).round();
-    final isPassed = percentage >= 80;
+    final isPassed = percentage >= _passThresholdPercentage;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -730,7 +734,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
             child: Text(
               isPassed
                   ? 'You passed the quiz! You\'re ready to move forward in your program.'
-                  : 'You need 80% to pass. Have another look at the lessons, then try again. There\'s no limit on attempts.',
+                  : 'You need $_passThresholdPercentage% to pass. Have another look at the lessons, then try again. There\'s no limit on attempts.',
               textAlign: TextAlign.center,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13.5,
@@ -769,7 +773,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
                 ),
-                _buildStatRow('Pass mark', '80%'),
+                _buildStatRow('Pass mark', '$_passThresholdPercentage%'),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
