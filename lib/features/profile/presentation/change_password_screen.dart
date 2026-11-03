@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../../auth/presentation/providers/auth_provider.dart';
 
 /// Change Password Screen matching design screenshot
-class ChangePasswordScreen extends StatefulWidget {
+class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({Key? key}) : super(key: key);
 
   @override
-  State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
+  ConsumerState<ChangePasswordScreen> createState() =>
+      _ChangePasswordScreenState();
 }
 
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
+class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   late final TextEditingController _currentPasswordController;
   late final TextEditingController _newPasswordController;
   late final TextEditingController _confirmPasswordController;
@@ -22,21 +26,138 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
+  bool _isUpdating = false;
 
   @override
   void initState() {
     super.initState();
-    _currentPasswordController = TextEditingController(text: '••••••');
-    _newPasswordController = TextEditingController(text: '••••••');
+    _currentPasswordController = TextEditingController();
+    _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
+
+    _currentPasswordController.addListener(_onPasswordChanged);
+    _newPasswordController.addListener(_onPasswordChanged);
+  }
+
+  void _onPasswordChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _currentPasswordController.removeListener(_onPasswordChanged);
+    _newPasswordController.removeListener(_onPasswordChanged);
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  bool get _has8Chars => _newPasswordController.text.length >= 8;
+  bool get _hasNumber => RegExp(r'\d').hasMatch(_newPasswordController.text);
+  bool get _isDifferent =>
+      _newPasswordController.text.isNotEmpty &&
+      _newPasswordController.text != _currentPasswordController.text;
+
+  Future<void> _handleUpdatePassword() async {
+    final currentPassword = _currentPasswordController.text;
+    final newPassword = _newPasswordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (currentPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your current password'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    if (newPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a new password'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New password must be at least 8 characters'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    if (!RegExp(r'\d').hasMatch(newPassword)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New password must include at least one number'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    if (newPassword == currentPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New password must be different from current password'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    if (newPassword != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New password and confirmation do not match'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdating = true;
+    });
+
+    final success = await ref.read(authNotifierProvider.notifier).changePassword(
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        );
+
+    if (mounted) {
+      setState(() {
+        _isUpdating = false;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password updated successfully'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+        context.pop();
+      } else {
+        final authState = ref.read(authStateProvider);
+        final errorMsg = authState.loginErrorMessage ??
+            'Failed to update password. Please check your current password.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: AppColors.alertErrorText,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -156,13 +277,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 12),
 
                     // Checklist
-                    _checkItem('At least 8 characters', isChecked: true),
+                    _checkItem('At least 8 characters', isChecked: _has8Chars),
                     const SizedBox(height: 6),
-                    _checkItem('Includes a number', isChecked: true),
+                    _checkItem('Includes a number', isChecked: _hasNumber),
                     const SizedBox(height: 6),
                     _checkItem(
                       'Different from your current password',
-                      isChecked: false,
+                      isChecked: _isDifferent,
                     ),
                     const SizedBox(height: 16),
 
@@ -220,9 +341,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               // Update Password Button
               AppButton(
                 text: 'Update password',
-                onPressed: () {
-                  context.pop();
-                },
+                isLoading: _isUpdating,
+                onPressed: _handleUpdatePassword,
               ),
               const SizedBox(height: 6),
               Center(

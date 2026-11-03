@@ -138,6 +138,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
                   // Email Address field
                   AppTextField(
+                    key: const ValueKey('signInEmailField'),
                     label: 'Email Address',
                     hintText: 'Enter your email',
                     controller: _emailController,
@@ -155,6 +156,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
                   // Password field
                   AppTextField(
+                    key: const ValueKey('signInPasswordField'),
                     label: 'Password',
                     hintText: 'Enter your password',
                     controller: _passwordController,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/config/app_constants.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -8,25 +9,28 @@ import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import 'providers/auth_provider.dart';
 
-/// 1.05 Forgot Password Screen
-class ForgotPasswordScreen extends StatefulWidget {
+/// 1.05 Forgot Password Screen dynamically calling POST /auth/password-reset
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState
+    extends ConsumerState<ForgotPasswordScreen> {
   late final TextEditingController _emailController;
   bool _isLoading = false;
-  // Initially show the success banner from mockup
-  bool _showSuccessBanner = true;
+  bool _showSuccessBanner = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(text: AppConstants.mockUserEmail);
+    _emailController = TextEditingController();
   }
 
   @override
@@ -36,17 +40,44 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _handleResetLink() async {
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter your email address.';
+        _showSuccessBanner = false;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
+      _showSuccessBanner = false;
     });
 
-    await Future.delayed(const Duration(milliseconds: 800));
+    final success = await ref
+        .read(authNotifierProvider.notifier)
+        .sendPasswordResetEmail(email);
 
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _showSuccessBanner = true;
       });
+
+      if (success) {
+        setState(() {
+          _showSuccessBanner = true;
+          _errorMessage = null;
+        });
+      } else {
+        final authState = ref.read(authStateProvider);
+        setState(() {
+          _showSuccessBanner = false;
+          _errorMessage = authState.loginErrorMessage ??
+              'Failed to send reset link. Please check your email and try again.';
+        });
+      }
     }
   }
 
@@ -83,6 +114,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               const SizedBox(height: 20),
 
+              // Error Notification Banner
+              if (_errorMessage != null) ...[
+                AppBanner.error(
+                  message: _errorMessage!,
+                  onClose: () {
+                    setState(() {
+                      _errorMessage = null;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
+              ],
+
               // Success Notification Banner
               if (_showSuccessBanner) ...[
                 AppBanner.success(
@@ -99,6 +143,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
               // Email Address Field
               AppTextField(
+                key: const ValueKey('forgotPasswordEmailField'),
                 label: 'Email Address',
                 hintText: 'Enter your email',
                 controller: _emailController,
@@ -106,12 +151,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _handleResetLink(),
+                onChanged: (_) {
+                  if (_errorMessage != null) {
+                    setState(() {
+                      _errorMessage = null;
+                    });
+                  }
+                },
               ),
               const SizedBox(height: 26),
 
-              // "Resend link  →" Button
+              // "Send link / Resend link" Button
               AppButton(
-                text: 'Resend link',
+                text: _showSuccessBanner ? 'Resend link' : 'Send link',
                 isLoading: _isLoading,
                 onPressed: _handleResetLink,
               ),

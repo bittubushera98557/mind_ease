@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/services/secure_storage_service.dart';
+import '../../data/models/user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 import 'auth_state.dart';
 
@@ -160,6 +163,118 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void clearError() {
     if (state.status == AuthStatus.error) {
       state = AuthState.unauthenticated();
+    }
+  }
+
+  /// Updates profile details via PATCH /me as multipart/form-data
+  Future<bool> updateProfile({
+    required String firstName,
+    required String lastName,
+    required String email,
+    String? mobile,
+    File? photoFile,
+  }) async {
+    try {
+      final updatedUser = await _repository.updateProfile(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        mobile: mobile,
+        photoFile: photoFile,
+      );
+
+      final current = state.user;
+      final newName = updatedUser.name.isNotEmpty
+          ? updatedUser.name
+          : '$firstName $lastName'.trim();
+      final newEmail = updatedUser.email.isNotEmpty
+          ? updatedUser.email
+          : email;
+
+      state = AuthState.authenticated(
+        UserModel(
+          id: current?.id ?? updatedUser.id,
+          name: newName,
+          firstName: firstName,
+          lastName: lastName,
+          email: newEmail,
+          mobile: mobile,
+          photo: updatedUser.photo ?? current?.photo,
+          createdAt: current?.createdAt ?? updatedUser.createdAt,
+        ),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Deletes user profile photo via DELETE /me/photo
+  Future<bool> deleteProfilePhoto() async {
+    try {
+      final updatedUser = await _repository.deleteProfilePhoto();
+      final current = state.user;
+
+      if (current != null) {
+        state = AuthState.authenticated(
+          UserModel(
+            id: current.id,
+            name: updatedUser.name.isNotEmpty ? updatedUser.name : current.name,
+            firstName: current.firstName,
+            lastName: current.lastName,
+            email: current.email,
+            mobile: current.mobile,
+            photo: null,
+            createdAt: current.createdAt,
+          ),
+        );
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Changes user password via PUT /me/password
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _repository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      return true;
+    } on ApiException catch (e) {
+      state = AuthState.loginError(
+        message: e.message,
+        code: e.code,
+      );
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Sends password reset email link via POST /auth/password-reset
+  Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      await _repository.sendPasswordResetEmail(email);
+      return true;
+    } on ApiException catch (e) {
+      state = AuthState.loginError(
+        message: e.message,
+        code: e.code,
+      );
+      return false;
+    } catch (e) {
+      state = AuthState.loginError(
+        message: e is Exception
+            ? e.toString().replaceAll('Exception: ', '')
+            : 'Failed to send reset link. Please try again.',
+      );
+      return false;
     }
   }
 }

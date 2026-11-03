@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
@@ -25,7 +28,10 @@ class _PersonalInformationScreenState
   late final TextEditingController _emailController;
   late final TextEditingController _mobileController;
 
+  File? _selectedPhotoFile;
   bool _remindersEnabled = true;
+  bool _isSaving = false;
+  bool _isDeletingPhoto = false;
 
   @override
   void initState() {
@@ -33,15 +39,15 @@ class _PersonalInformationScreenState
     final user = ref.read(authStateProvider).user;
     final fullName = user?.name ?? 'Ramsey Saikrishna';
     final parts = fullName.split(' ');
-    final firstName = parts.isNotEmpty ? parts.first : 'Ramsey';
-    final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : 'Saikrishna';
+    final firstName = user?.firstName ?? (parts.isNotEmpty ? parts.first : 'Ramsey');
+    final lastName = user?.lastName ?? (parts.length > 1 ? parts.sublist(1).join(' ') : 'Saikrishna');
 
     _firstNameController = TextEditingController(text: firstName);
     _lastNameController = TextEditingController(text: lastName);
     _preferredNameController = TextEditingController(text: firstName);
     _emailController =
         TextEditingController(text: user?.email ?? 'ramsey@hyperiontech.com.au');
-    _mobileController = TextEditingController(text: '04XX XXX XXX');
+    _mobileController = TextEditingController(text: user?.mobile ?? '04XX XXX XXX');
   }
 
   @override
@@ -54,11 +60,240 @@ class _PersonalInformationScreenState
     super.dispose();
   }
 
+  bool get _hasPhoto {
+    final userPhoto = ref.read(authStateProvider).user?.photo;
+    return _selectedPhotoFile != null || (userPhoto != null && userPhoto.isNotEmpty);
+  }
+
+  Future<void> _handleDeletePhoto() async {
+    if (_selectedPhotoFile != null) {
+      setState(() {
+        _selectedPhotoFile = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isDeletingPhoto = true;
+    });
+
+    final success = await ref.read(authNotifierProvider.notifier).deleteProfilePhoto();
+
+    if (mounted) {
+      setState(() {
+        _isDeletingPhoto = false;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile photo deleted'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete photo. Please try again.'),
+            backgroundColor: AppColors.alertErrorText,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickPhoto() async {
+    final String? action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Select Profile Photo',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+                  title: Text(
+                    'From gallery',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'gallery'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+                  title: Text(
+                    'From camera',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'camera'),
+                ),
+                if (_hasPhoto)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline_rounded, color: AppColors.alertErrorText),
+                    title: Text(
+                      'Delete photo',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.alertErrorText,
+                      ),
+                    ),
+                    onTap: () => Navigator.pop(ctx, 'delete'),
+                  ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, null),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.inputBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (action == null) return;
+
+    if (action == 'delete') {
+      await _handleDeletePhoto();
+      return;
+    }
+
+    final source = action == 'camera' ? ImageSource.camera : ImageSource.gallery;
+
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (picked != null) {
+        setState(() {
+          _selectedPhotoFile = File(picked.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image: $e'),
+            backgroundColor: AppColors.alertErrorText,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleSaveChanges() async {
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final email = _emailController.text.trim();
+    final mobile = _mobileController.text.trim();
+
+    if (firstName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('First name cannot be empty'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email cannot be empty'),
+          backgroundColor: AppColors.alertErrorText,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    final success = await ref.read(authNotifierProvider.notifier).updateProfile(
+          firstName: firstName,
+          lastName: lastName,
+          email: email,
+          mobile: mobile,
+          photoFile: _selectedPhotoFile,
+        );
+
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+        context.pop();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update profile. Please try again.'),
+            backgroundColor: AppColors.alertErrorText,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).user;
     final initial =
         (user?.name.isNotEmpty == true) ? user!.name[0].toUpperCase() : 'R';
+    final hasExistingPhoto = _selectedPhotoFile != null || (user?.photo != null && user!.photo!.isNotEmpty);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -111,47 +346,111 @@ class _PersonalInformationScreenState
                   children: [
                     Stack(
                       children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
+                        GestureDetector(
+                          onTap: _pickPhoto,
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: ClipOval(
+                              child: _selectedPhotoFile != null
+                                  ? Image.file(
+                                      _selectedPhotoFile!,
+                                      fit: BoxFit.cover,
+                                      width: 80,
+                                      height: 80,
+                                    )
+                                  : user?.photo != null && user!.photo!.isNotEmpty
+                                      ? Image.network(
+                                          user.photo!,
+                                          fit: BoxFit.cover,
+                                          width: 80,
+                                          height: 80,
+                                          errorBuilder: (ctx, err, stack) => Center(
+                                            child: Text(
+                                              initial,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 34,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            initial,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 34,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                            ),
                           ),
-                          child: Center(
-                            child: Text(
-                              initial,
-                              style: GoogleFonts.outfit(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w700,
+                        ),
+                        // Camera icon (bottom-right)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: GestureDetector(
+                            onTap: _pickPhoto,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6B584A),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                size: 14,
                                 color: Colors.white,
                               ),
                             ),
                           ),
                         ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6B584A),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt_rounded,
-                              size: 14,
-                              color: Colors.white,
+                        // Delete icon (top-right) if photo exists
+                        if (hasExistingPhoto)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: _isDeletingPhoto ? null : _handleDeletePhoto,
+                              child: Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: AppColors.alertErrorText,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: _isDeletingPhoto
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(5),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Photo is optional. Initials show if none is set.',
+                      'Photo is optional. Tap to select or change.',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w400,
@@ -440,9 +739,8 @@ class _PersonalInformationScreenState
               // Save Changes Button
               AppButton(
                 text: 'Save changes',
-                onPressed: () {
-                  context.pop();
-                },
+                isLoading: _isSaving,
+                onPressed: _handleSaveChanges,
               ),
               const SizedBox(height: 6),
               Center(

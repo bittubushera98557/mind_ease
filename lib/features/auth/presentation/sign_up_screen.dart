@@ -193,6 +193,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                     // Your Name field
                     AppTextField(
+                      key: const ValueKey('signUpNameField'),
                       label: 'Your Name',
                       hintText: 'Enter your name',
                       controller: _nameController,
@@ -213,6 +214,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                     // Email Address field
                     AppTextField(
+                      key: const ValueKey('signUpEmailField'),
                       label: 'Email Address',
                       hintText: 'Enter your email',
                       controller: _emailController,
@@ -234,6 +236,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                     // Password field
                     AppTextField(
+                      key: const ValueKey('signUpPasswordField'),
                       label: 'Password',
                       hintText: 'Enter your password',
                       controller: _passwordController,
@@ -255,6 +258,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                     // Password Confirmation field
                     AppTextField(
+                      key: const ValueKey('signUpConfirmPasswordField'),
                       label: 'Password Confirmation',
                       hintText: 'Re-enter your password',
                       controller: _confirmPasswordController,

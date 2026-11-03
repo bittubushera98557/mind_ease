@@ -255,6 +255,26 @@ class DioClient {
     }
   }
 
+  Future<ApiResponse<T>> patch<T>(
+    String path, {
+    dynamic body,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    try {
+      final response = await dio.patch(
+        path,
+        data: body,
+        queryParameters: queryParameters,
+        options: options,
+      );
+      return _processResponse<T>(response, fromJson);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
   Future<ApiResponse<T>> delete<T>(
     String path, {
     Map<String, dynamic>? queryParameters,
