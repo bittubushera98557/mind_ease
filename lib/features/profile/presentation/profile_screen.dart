@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
+import '../../dashboard/data/models/points_model.dart';
+import '../../dashboard/presentation/providers/points_provider.dart';
 
 /// 2.04 Profile Screen
 class ProfileScreen extends ConsumerWidget {
@@ -15,161 +17,178 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     final user = authState.user;
+    final userPointsAsync = ref.watch(userPointsProvider);
 
-    final userName = user?.name.isNotEmpty == true ? user!.name : 'Ramsy Saikrishna';
-    final userEmail = user?.email.isNotEmpty == true ? user!.email : 'ramsy@hyperiontech.com';
+    final userName =
+        user?.name.isNotEmpty == true ? user!.name : 'Ramsy Saikrishna';
+    final userEmail = user?.email.isNotEmpty == true
+        ? user!.email
+        : 'ramsy@hyperiontech.com';
     final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'R';
+    final userPhoto = user?.photo;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(context, userName, userEmail, userInitial),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(userPointsProvider);
+        },
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          child: Column(
+            children: [
+              // Header
+              _buildHeader(context, userName, userEmail, userInitial, userPhoto),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Points Breakdown Card
-                  _buildPointsCard(),
-                  const SizedBox(height: 24),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Dynamic Points Breakdown Card
+                    _buildPointsCard(userPointsAsync),
+                    const SizedBox(height: 24),
 
-                  // MY ACCOUNT Section
-                  _buildSectionHeader('MY ACCOUNT'),
-                  const SizedBox(height: 8),
-                  _buildCardGroup([
-                    _buildListTile(
-                      icon: Icons.person_outline_rounded,
-                      title: 'Personal information',
-                      subtitle: 'Name, email, password',
-                      onTap: () {
-                        context.push(RouteNames.personalInformation);
-                      },
-                    ),
-                  ]),
-                  const SizedBox(height: 24),
+                    // MY ACCOUNT Section
+                    _buildSectionHeader('MY ACCOUNT'),
+                    const SizedBox(height: 8),
+                    _buildCardGroup([
+                      _buildListTile(
+                        icon: Icons.person_outline_rounded,
+                        title: 'Personal information',
+                        subtitle: 'Name, email, password',
+                        onTap: () {
+                          context.push(RouteNames.personalInformation);
+                        },
+                      ),
+                    ]),
+                    const SizedBox(height: 24),
 
-                  // MY ASSESSMENT Section
-                  _buildSectionHeader('MY ASSESSMENT'),
-                  const SizedBox(height: 8),
-                  _buildCardGroup([
-                    _buildListTile(
-                      icon: Icons.auto_awesome_outlined,
-                      title: 'View my suggestions',
-                      subtitle: 'Completed 24/10/2024, 9:10',
-                      onTap: () {
-                        context.push(RouteNames.questionnaireResults);
-                      },
-                    ),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
-                    _buildListTile(
-                      icon: Icons.refresh_rounded,
-                      title: 'Retake questionnaire',
-                      subtitle: 'Update your answers and focus phases',
-                      onTap: () {
-                        context.push(RouteNames.questionnaireIntro);
-                      },
-                    ),
-                  ]),
-                  const SizedBox(height: 24),
+                    // MY ASSESSMENT Section
+                    _buildSectionHeader('MY ASSESSMENT'),
+                    const SizedBox(height: 8),
+                    _buildCardGroup([
+                      _buildListTile(
+                        icon: Icons.auto_awesome_outlined,
+                        title: 'View my suggestions',
+                        subtitle: 'Completed 24/10/2024, 9:10',
+                        onTap: () {
+                          context.push(RouteNames.questionnaireResults);
+                        },
+                      ),
+                      const Divider(
+                          height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
+                      _buildListTile(
+                        icon: Icons.refresh_rounded,
+                        title: 'Retake questionnaire',
+                        subtitle: 'Update your answers and focus phases',
+                        onTap: () {
+                          context.push(RouteNames.questionnaireIntro);
+                        },
+                      ),
+                    ]),
+                    const SizedBox(height: 24),
 
-                  // SUPPORT AND PRIVACY Section
-                  _buildSectionHeader('SUPPORT AND PRIVACY'),
-                  const SizedBox(height: 8),
-                  _buildCardGroup([
-                    _buildListTile(
-                      icon: Icons.support_rounded,
-                      title: 'Get help now',
-                      subtitle: 'Emergency and 24/7 support lines',
-                      onTap: () {
-                        context.push(RouteNames.supportOptions);
-                      },
-                    ),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
-                    _buildListTile(
-                      icon: Icons.shield_outlined,
-                      title: 'Privacy policy',
-                      onTap: () {
-                        context.push(RouteNames.privacyPolicy);
-                      },
-                    ),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
-                    _buildListTile(
-                      icon: Icons.article_outlined,
-                      title: 'Terms of use',
-                      onTap: () {
-                        context.push(RouteNames.termsOfUse);
-                      },
-                    ),
-                  ]),
-                  const SizedBox(height: 12),
+                    // SUPPORT AND PRIVACY Section
+                    _buildSectionHeader('SUPPORT AND PRIVACY'),
+                    const SizedBox(height: 8),
+                    _buildCardGroup([
+                      _buildListTile(
+                        icon: Icons.support_rounded,
+                        title: 'Get help now',
+                        subtitle: 'Emergency and 24/7 support lines',
+                        onTap: () {
+                          context.push(RouteNames.supportOptions);
+                        },
+                      ),
+                      const Divider(
+                          height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
+                      _buildListTile(
+                        icon: Icons.shield_outlined,
+                        title: 'Privacy policy',
+                        onTap: () {
+                          context.push(RouteNames.privacyPolicy);
+                        },
+                      ),
+                      const Divider(
+                          height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
+                      _buildListTile(
+                        icon: Icons.article_outlined,
+                        title: 'Terms of use',
+                        onTap: () {
+                          context.push(RouteNames.termsOfUse);
+                        },
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
 
-                  // Privacy Lock Note
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.lock_outline_rounded,
-                          size: 14,
-                          color: AppColors.textTertiary,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Your reflections and answers are private to your account.',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
-                              color: AppColors.textTertiary,
+                    // Privacy Lock Note
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.lock_outline_rounded,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Your reflections and answers are private to your account.',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textTertiary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                  // Sign Out Button
-                  _buildCardGroup([
-                    _buildListTile(
-                      icon: Icons.logout_rounded,
-                      title: 'Sign out',
-                      titleColor: AppColors.textPrimary,
-                      onTap: () {
-                        context.go(RouteNames.signIn);
-                        ref.read(authNotifierProvider.notifier).logout();
-                      },
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
+                    // Sign Out Button
+                    _buildCardGroup([
+                      _buildListTile(
+                        icon: Icons.logout_rounded,
+                        title: 'Sign out',
+                        titleColor: AppColors.textPrimary,
+                        onTap: () {
+                          context.go(RouteNames.signIn);
+                          ref.read(authNotifierProvider.notifier).logout();
+                        },
+                      ),
+                    ]),
+                    const SizedBox(height: 16),
 
-                  // Delete Account Link
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        _showDeleteAccountConfirmationDialog(context, ref);
-                      },
-                      child: Text(
-                        'Delete account',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                          decoration: TextDecoration.underline,
+                    // Delete Account Link
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          _showDeleteAccountConfirmationDialog(context, ref);
+                        },
+                        child: Text(
+                          'Delete account',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -180,6 +199,7 @@ class ProfileScreen extends ConsumerWidget {
     String name,
     String email,
     String initial,
+    String? photo,
   ) {
     return Container(
       width: double.infinity,
@@ -203,15 +223,34 @@ class ProfileScreen extends ConsumerWidget {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: Center(
-              child: Text(
-                initial,
-                style: GoogleFonts.outfit(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
+            child: ClipOval(
+              child: photo != null && photo.isNotEmpty
+                  ? Image.network(
+                      photo,
+                      fit: BoxFit.cover,
+                      width: 72,
+                      height: 72,
+                      errorBuilder: (ctx, err, stack) => Center(
+                        child: Text(
+                          initial,
+                          style: GoogleFonts.outfit(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        initial,
+                        style: GoogleFonts.outfit(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 12),
@@ -241,13 +280,26 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPointsCard() {
-    final pointsList = [
-      {'phase': "Phase 1: How's Your Head. Really?", 'pts': '+100'},
-      {'phase': 'Phase 2: Check Yourself. Kindly', 'pts': '-'},
-      {'phase': 'Phase 3: Safe to Feel. Safe to Speak', 'pts': '-'},
-      {'phase': 'Phase 4: Mental Health First Aid', 'pts': '-'},
+  Widget _buildPointsCard(AsyncValue<PointsModel> userPointsAsync) {
+    return userPointsAsync.when(
+      data: (pointsModel) =>
+          _buildPointsCardContent(pointsModel.total, pointsModel.awards),
+      loading: () => _buildPointsCardContent(null, []),
+      error: (_, __) => _buildPointsCardContent(0, []),
+    );
+  }
+
+  Widget _buildPointsCardContent(
+      int? totalPoints, List<PointAwardModel> awards) {
+    final defaultPhases = [
+      {'phase': "Phase 1: How's Your Head. Really?", 'id': 'phase-1'},
+      {'phase': 'Phase 2: Check Yourself. Kindly', 'id': 'phase-2'},
+      {'phase': 'Phase 3: Safe to Feel. Safe to Speak', 'id': 'phase-3'},
+      {'phase': 'Phase 4: Mental Health First Aid', 'id': 'phase-4'},
     ];
+
+    final displayPointsStr =
+        totalPoints == null ? '... points' : '$totalPoints points';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -268,7 +320,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '100 points',
+                displayPointsStr,
                 style: GoogleFonts.outfit(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -289,7 +341,31 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 14),
           const Divider(height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
           const SizedBox(height: 10),
-          ...pointsList.map((item) {
+          ...defaultPhases.asMap().entries.map((entry) {
+            final index = entry.key;
+            final phaseData = entry.value;
+
+            // Find matching award if exists
+            PointAwardModel? award;
+            if (awards.isNotEmpty) {
+              for (final a in awards) {
+                if (a.phaseId == phaseData['id'] ||
+                    a.phaseId.contains('${index + 1}')) {
+                  award = a;
+                  break;
+                }
+              }
+            }
+
+            int ptsValue = 0;
+            if (award != null && award.points > 0) {
+              ptsValue = award.points;
+            } else if (index == 0 && (totalPoints ?? 0) > 0 && awards.isEmpty) {
+              ptsValue = totalPoints!;
+            }
+
+            final ptsText = ptsValue > 0 ? '+$ptsValue' : '-';
+
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -297,7 +373,7 @@ class ProfileScreen extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      item['phase']!,
+                      phaseData['phase']!,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
@@ -306,11 +382,11 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    item['pts']!,
+                    ptsText,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: item['pts'] == '+100'
+                      color: ptsValue > 0
                           ? const Color(0xFF7EAA83)
                           : AppColors.textTertiary,
                     ),

@@ -29,6 +29,8 @@ class AssessmentResponseModel {
     Map<String, dynamic> parsedAnswers = {};
     if (json['answers'] is Map<String, dynamic>) {
       parsedAnswers = Map<String, dynamic>.from(json['answers'] as Map);
+    } else if (json['answers'] is List) {
+      parsedAnswers = {'answers': json['answers']};
     }
 
     return AssessmentResponseModel(

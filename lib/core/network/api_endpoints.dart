@@ -35,3 +35,11 @@ class ApiEndpoints {
   // Telehealth / Zoom Video SDK Token endpoint
   static const String telehealthToken = '/telehealth/token';
 }
+
+
+/*
+need to work on
+static const String currentUser = '/me'; // it will be hit with bearer token
+  static const String deleteMyPhoto = '/me/photo'; // it will be hit with bearer token
+https://api.mindease.me/v1/me/assessment submit questionaries answer based on step
+ */

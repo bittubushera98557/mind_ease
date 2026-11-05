@@ -31,10 +31,14 @@ class SecureStorageService {
     required String id,
     required String name,
     required String email,
+    String? createdAt,
   }) async {
     await _storage.write(key: 'user_id', value: id);
     await _storage.write(key: 'user_name', value: name);
     await _storage.write(key: AppConstants.keyUserEmail, value: email);
+    if (createdAt != null && createdAt.isNotEmpty) {
+      await _storage.write(key: 'user_created_at', value: createdAt);
+    }
   }
 
   Future<String?> getUserName() async {
@@ -47,6 +51,10 @@ class SecureStorageService {
 
   Future<String?> getUserId() async {
     return await _storage.read(key: 'user_id');
+  }
+
+  Future<String?> getUserCreatedAt() async {
+    return await _storage.read(key: 'user_created_at');
   }
 
   // Clear all storage

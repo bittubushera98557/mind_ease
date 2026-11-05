@@ -727,7 +727,7 @@ class _PersonalInformationScreenState
               const SizedBox(height: 16),
 
               Text(
-                'Member since 26/10/2024',
+                _formatMemberSince(user?.createdAt),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w500,
@@ -758,6 +758,21 @@ class _PersonalInformationScreenState
         ),
       ),
     );
+  }
+
+  String _formatMemberSince(String? createdAtRaw) {
+    if (createdAtRaw == null || createdAtRaw.trim().isEmpty) {
+      return 'Member since 26/10/2024';
+    }
+    final dt = DateTime.tryParse(createdAtRaw.trim());
+    if (dt == null) {
+      return 'Member since $createdAtRaw';
+    }
+    final localDt = dt.toLocal();
+    final day = localDt.day.toString().padLeft(2, '0');
+    final month = localDt.month.toString().padLeft(2, '0');
+    final year = localDt.year;
+    return 'Member since $day/$month/$year';
   }
 
   InputDecoration _buildInputDecoration() {

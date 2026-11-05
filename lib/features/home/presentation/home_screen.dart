@@ -1,59 +1,92 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../core/config/app_constants.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/presentation/providers/auth_provider.dart';
+import '../../dashboard/presentation/providers/points_provider.dart';
 
 /// 2.01 Home Screen
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).user;
+    final userPointsAsync = ref.watch(userPointsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: [
-            // Top Terracotta Header
-            _buildHeader(context),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final prefs = await SharedPreferences.getInstance();
+        String?   authToken = prefs.getString(AppConstants.keyAuthToken);
+          debugPrint("Home authToke=$authToken");
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Continue where you left off
-                  GestureDetector(
-                      onTap : (){
-              context.push(RouteNames.phaseDetail);
+          ref.invalidate(userPointsProvider);
+        },
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          child: Column(
+            children: [
+              // Top Terracotta Header
+              _buildHeader(context, user, userPointsAsync),
 
-            },
-                       child: _buildContinueSection()),
-                  const SizedBox(height: 24),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Continue where you left off
+                    GestureDetector(
+                      onTap: () {
+                        context.push(RouteNames.phaseDetail);
+                      },
+                      child: _buildContinueSection(),
+                    ),
+                    const SizedBox(height: 24),
 
-                  // Your Focus
-                  _buildYourFocusSection(context),
-                  const SizedBox(height: 24),
+                    // Your Focus
+                    _buildYourFocusSection(context),
+                    const SizedBox(height: 24),
 
-                  // Support Banner Card
-                  _buildSupportBanner(context),
-                  const SizedBox(height: 24),
+                    // Support Banner Card
+                    _buildSupportBanner(context),
+                    const SizedBox(height: 24),
 
-                  // Need to talk to someone?
-                  _buildNeedToTalkSection(context),
-                  const SizedBox(height: 32),
-                ],
+                    // Need to talk to someone?
+                    _buildNeedToTalkSection(context),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(
+    BuildContext context,
+    dynamic user,
+    AsyncValue<dynamic> userPointsAsync,
+  ) {
+    final displayName = user?.firstName?.isNotEmpty == true
+        ? user!.firstName!
+        : (user?.name.isNotEmpty == true ? user!.name.split(' ').first : 'Ramsy');
+
+    final initial =
+        (user?.name.isNotEmpty == true) ? user!.name[0].toUpperCase() : 'R';
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -74,7 +107,8 @@ class HomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(20),
@@ -126,15 +160,34 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),
-                child: Center(
-                  child: Text(
-                    'R',
-                    style: GoogleFonts.outfit(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
+                child: ClipOval(
+                  child: user?.photo != null && user!.photo!.isNotEmpty
+                      ? Image.network(
+                          user.photo!,
+                          fit: BoxFit.cover,
+                          width: 48,
+                          height: 48,
+                          errorBuilder: (ctx, err, stack) => Center(
+                            child: Text(
+                              initial,
+                              style: GoogleFonts.outfit(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            initial,
+                            style: GoogleFonts.outfit(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -143,7 +196,7 @@ class HomeScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Hi, Ramsy',
+                      'Hi, $displayName',
                       style: GoogleFonts.outfit(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
@@ -153,9 +206,10 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        // Points Pill
+                        // Dynamic Points Pill
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.18),
                             borderRadius: BorderRadius.circular(16),
@@ -168,12 +222,30 @@ class HomeScreen extends StatelessWidget {
                                 color: Color(0xFFF4A261),
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                '100 points',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                              userPointsAsync.when(
+                                data: (pointsModel) => Text(
+                                  '${pointsModel.total} points',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                loading: () => Text(
+                                  '... points',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                error: (_, __) => Text(
+                                  '0 points',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ],
@@ -182,7 +254,8 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         // Program % Pill
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.18),
                             borderRadius: BorderRadius.circular(16),
@@ -371,7 +444,8 @@ class HomeScreen extends StatelessWidget {
               return Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       children: [
                         Icon(
@@ -394,7 +468,8 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   if (!isLast)
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
+                    const Divider(
+                        height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
                 ],
               );
             }).toList(),

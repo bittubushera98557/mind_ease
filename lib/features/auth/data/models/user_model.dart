@@ -36,7 +36,7 @@ class UserModel {
       email: json['email']?.toString() ?? '',
       mobile: json['mobile']?.toString() ?? json['phone']?.toString(),
       photo: json['photo']?.toString() ?? json['photoUrl']?.toString() ?? json['avatar']?.toString(),
-      createdAt: json['createdAt']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? json['created_at']?.toString(),
     );
   }
 

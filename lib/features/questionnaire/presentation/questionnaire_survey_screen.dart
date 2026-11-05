@@ -114,6 +114,7 @@ class QuestionnaireSurveyScreen extends ConsumerStatefulWidget {
 class _QuestionnaireSurveyScreenState
     extends ConsumerState<QuestionnaireSurveyScreen> {
   late int _currentIndex;
+  bool _isSubmitting = false;
 
   /// Stores the selected answer labels per question index.
   final Map<int, Set<String>> _answers = {};
@@ -181,11 +182,41 @@ class _QuestionnaireSurveyScreenState
     });
   }
 
-  void _advance(int totalQuestions) {
-    if (_currentIndex >= totalQuestions - 1) {
-      context.push(RouteNames.questionnaireResults);
-    } else {
-      setState(() => _currentIndex++);
+  Future<void> _advance(int totalQuestions, String? version) async {
+    if (_isSubmitting) return;
+
+    final isLast = _currentIndex >= totalQuestions - 1;
+    final currentAnswers = (_answers[_currentIndex] ?? {}).toList();
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final repository = ref.read(questionnaireRepositoryProvider);
+      await repository.submitAssessmentStep(
+        answers: currentAnswers,
+        step: _currentIndex,
+        completedAt: isLast ? DateTime.now().toUtc().toIso8601String() : null,
+        nextStepsSeen: isLast,
+        questionnaireVersion: version,
+      );
+    } catch (e) {
+      debugPrint('Error submitting assessment step: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+
+        if (isLast) {
+          context.push(RouteNames.questionnaireResults);
+        } else {
+          setState(() {
+            _currentIndex++;
+          });
+        }
+      }
     }
   }
 
@@ -263,8 +294,9 @@ class _QuestionnaireSurveyScreenState
                 _BottomActions(
                   hasAnswer: hasAnswer,
                   isLast: isLast,
-                  onContinue: () => _advance(total),
-                  onSkip: () => _advance(total),
+                  isLoading: _isSubmitting,
+                  onContinue: () => _advance(total, model.version),
+                  onSkip: () => _advance(total, model.version),
                 ),
               ],
             );
@@ -589,12 +621,14 @@ class _SelectionIndicator extends StatelessWidget {
 class _BottomActions extends StatelessWidget {
   final bool hasAnswer;
   final bool isLast;
+  final bool isLoading;
   final VoidCallback onContinue;
   final VoidCallback onSkip;
 
   const _BottomActions({
     required this.hasAnswer,
     required this.isLast,
+    this.isLoading = false,
     required this.onContinue,
     required this.onSkip,
   });
@@ -612,13 +646,14 @@ class _BottomActions extends StatelessWidget {
         children: [
           AppButton(
             text: isLast ? 'See my suggestions' : 'Continue',
-            onPressed: hasAnswer ? onContinue : null,
+            onPressed: hasAnswer && !isLoading ? onContinue : null,
+            isLoading: isLoading,
             backgroundColor:
                 hasAnswer ? AppColors.primary : const Color(0xFFD0CBC6),
           ),
           const SizedBox(height: AppSpacing.sm),
           GestureDetector(
-            onTap: onSkip,
+            onTap: isLoading ? null : onSkip,
             child: Text(
               'Skip this question',
               style: AppTypography.linkText.copyWith(

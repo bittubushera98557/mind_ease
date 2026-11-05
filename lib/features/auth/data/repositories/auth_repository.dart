@@ -44,6 +44,7 @@ class AuthRepository {
         id: authData.user.id,
         name: authData.user.name,
         email: authData.user.email,
+        createdAt: authData.user.createdAt,
       );
 
       return authData;
@@ -76,6 +77,7 @@ class AuthRepository {
         id: authData.user.id,
         name: authData.user.name,
         email: authData.user.email,
+        createdAt: authData.user.createdAt,
       );
 
       return authData;
@@ -92,12 +94,14 @@ class AuthRepository {
     final id = await _storageService.getUserId();
     final name = await _storageService.getUserName();
     final email = await _storageService.getUserEmail();
+    final createdAt = await _storageService.getUserCreatedAt();
 
     if (id != null && email != null) {
       return UserModel(
         id: id,
         name: name ?? '',
         email: email,
+        createdAt: createdAt,
       );
     }
     return null;
@@ -195,6 +199,7 @@ class AuthRepository {
         id: updatedUser.id,
         name: fullName,
         email: updatedUser.email.isNotEmpty ? updatedUser.email : email,
+        createdAt: updatedUser.createdAt,
       );
       return updatedUser;
     }
@@ -232,6 +237,7 @@ class AuthRepository {
         id: updatedUser.id,
         name: updatedUser.name,
         email: updatedUser.email,
+        createdAt: updatedUser.createdAt,
       );
       return updatedUser;
     }

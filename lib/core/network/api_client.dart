@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,6 +40,8 @@ class ApiClient {
     try {
       final prefs = await SharedPreferences.getInstance();
       _authToken = prefs.getString(AppConstants.keyAuthToken);
+      debugPrint("authToke=$_authToken");
+
       return _authToken;
     } catch (_) {
       return null;
@@ -63,6 +66,8 @@ class ApiClient {
 
   Future<Map<String, String>> _getHeaders({Map<String, String>? extraHeaders}) async {
     final token = await getAuthToken();
+
+    debugPrint("authToke=$token");
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
