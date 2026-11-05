@@ -12,12 +12,14 @@ class PhaseDetailScreen extends StatelessWidget {
   final ProgramPhaseModel? phase;
   final int phaseNumber;
   final String phaseTitle;
+  final String? programId;
 
   const PhaseDetailScreen({
     Key? key,
     this.phase,
     this.phaseNumber = 1,
     this.phaseTitle = "How's Your Head, Really?",
+    this.programId,
   }) : super(key: key);
 
   @override
@@ -171,6 +173,8 @@ class PhaseDetailScreen extends StatelessWidget {
                             extra: {
                               'quiz': quiz,
                               'phaseNumber': effectiveNumber,
+                              'programId': programId,
+                              'phaseId': phase?.id,
                             },
                           ),
                         ),

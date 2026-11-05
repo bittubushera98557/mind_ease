@@ -37,17 +37,17 @@ class _PersonalInformationScreenState
   void initState() {
     super.initState();
     final user = ref.read(authStateProvider).user;
-    final fullName = user?.name ?? 'Ramsey Saikrishna';
+    final fullName = user?.name ?? 'Ramsey Roy';
     final parts = fullName.split(' ');
     final firstName = user?.firstName ?? (parts.isNotEmpty ? parts.first : 'Ramsey');
-    final lastName = user?.lastName ?? (parts.length > 1 ? parts.sublist(1).join(' ') : 'Saikrishna');
+    final lastName = user?.lastName ?? (parts.length > 1 ? parts.sublist(1).join(' ') : 'Roy');
 
     _firstNameController = TextEditingController(text: firstName);
     _lastNameController = TextEditingController(text: lastName);
     _preferredNameController = TextEditingController(text: firstName);
     _emailController =
         TextEditingController(text: user?.email ?? 'ramsey@hyperiontech.com.au');
-    _mobileController = TextEditingController(text: user?.mobile ?? '04XX XXX XXX');
+    _mobileController = TextEditingController(text: user?.mobile ?? ''); //0412 345 678
   }
 
   @override
@@ -229,6 +229,7 @@ class _PersonalInformationScreenState
   Future<void> _handleSaveChanges() async {
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
+    final preferredName = _preferredNameController.text.trim();
     final email = _emailController.text.trim();
     final mobile = _mobileController.text.trim();
 
@@ -259,9 +260,12 @@ class _PersonalInformationScreenState
     final success = await ref.read(authNotifierProvider.notifier).updateProfile(
           firstName: firstName,
           lastName: lastName,
+          preferredName: preferredName,
           email: email,
           mobile: mobile,
-          photoFile: _selectedPhotoFile,
+          remindersEnabled: _remindersEnabled,
+          removePhoto: false,
+        //  photoFile: _selectedPhotoFile,
         );
 
     if (mounted) {
@@ -276,7 +280,11 @@ class _PersonalInformationScreenState
             backgroundColor: AppColors.primary,
           ),
         );
-        context.pop();
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go(RouteNames.dashboard, extra: 3);
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -309,7 +317,13 @@ class _PersonalInformationScreenState
                 children: [
                   CircularBackButton(
                     isLightOnDark: false,
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go(RouteNames.dashboard, extra: 3);
+                      }
+                    },
                   ),
                   const Expanded(
                     child: Center(
@@ -481,7 +495,7 @@ class _PersonalInformationScreenState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'First name',
+                                'First name*',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -561,13 +575,27 @@ class _PersonalInformationScreenState
                     const SizedBox(height: 16),
 
                     // Email
-                    Text(
-                      'Email',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
+                    Row(
+                      children:[
+                        Text(
+                            'Email*',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                        ),
+                        Text(
+                          '(Cannot be changeable)',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+
+                      ]
+
                     ),
                     const SizedBox(height: 6),
                     TextField(
@@ -578,9 +606,11 @@ class _PersonalInformationScreenState
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
+                      enabled: false,
                       decoration: _buildInputDecoration(),
                     ),
                     const SizedBox(height: 4),
+/*
                     Text(
                       'Changing your email sends a verification link to the new address.',
                       style: GoogleFonts.plusJakartaSans(
@@ -588,6 +618,7 @@ class _PersonalInformationScreenState
                         color: AppColors.textTertiary,
                       ),
                     ),
+*/
                     const SizedBox(height: 16),
 
                     // Mobile Number

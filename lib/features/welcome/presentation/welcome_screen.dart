@@ -51,8 +51,8 @@ class WelcomeScreen extends StatelessWidget {
 
               // 5 Expressive Mood Emojis
               const MoodEmojisRow(
-                emojiSize: 36,
-                initialSelected: MoodType.happy,
+                emojiSize: 58,
+                initialSelected: MoodType.neutral,
               ),
 
               const Spacer(flex: 3),

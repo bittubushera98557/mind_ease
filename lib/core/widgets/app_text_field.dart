@@ -120,16 +120,15 @@ class _AppTextFieldState extends State<AppTextField> {
               width: (widget.state == AppTextFieldState.valid || hasError || _isFocused) ? 1.5 : 1.1,
             ),
           ),
-          child: TextFormField(
+          child: TextField(
             controller: widget.controller,
-            initialValue: widget.controller == null ? widget.initialValue : null,
             focusNode: _focusNode,
             obscureText: _obscureText,
             keyboardType: widget.keyboardType,
             textInputAction: widget.textInputAction,
             readOnly: widget.readOnly,
             onChanged: widget.onChanged,
-            onFieldSubmitted: widget.onSubmitted,
+            onSubmitted: widget.onSubmitted,
             style: AppTypography.inputText,
             textAlignVertical: TextAlignVertical.center,
             decoration: InputDecoration(

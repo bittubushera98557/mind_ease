@@ -21,19 +21,14 @@ class SignInScreen extends ConsumerStatefulWidget {
 }
 
 class _SignInScreenState extends ConsumerState<SignInScreen> {
-  late final TextEditingController _emailController;
-  late final TextEditingController _passwordController;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
-  bool _isLoading = false;
-  String? _errorMessage;
+  String? _localError;
 
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(text: '');
-    _passwordController = TextEditingController();
-
-    // Clear any leftover auth errors from other screens upon entering
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authNotifierProvider.notifier).clearError();
     });
@@ -47,19 +42,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 
   Future<void> _handleSignIn() async {
+    // Dismiss soft/hardware keyboard cleanly before processing submission
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter both email and password.';
+        _localError = 'Please enter both email and password.';
       });
       return;
     }
 
     setState(() {
-      _errorMessage = null;
-      _isLoading = true;
+      _localError = null;
     });
 
     final success = await ref.read(authNotifierProvider.notifier).login(
@@ -67,27 +64,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           password: password,
         );
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (success) {
-        context.go(RouteNames.dashboard);
-      } else {
-        final authState = ref.read(authStateProvider);
-        setState(() {
-          _errorMessage = authState.loginErrorMessage ??
-              'That email and password don\'t match. Please try again.';
-        });
-      }
+    if (mounted && success) {
+      context.go(RouteNames.dashboard);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final bannerMessage = _errorMessage ??
+    final isLoading = authState.status == AuthStatus.loading;
+    final bannerMessage = _localError ??
         (authState.status == AuthStatus.error ? authState.loginErrorMessage : null);
 
     return Scaffold(
@@ -122,19 +108,25 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Error / Warning Alert Banner
-                  if (bannerMessage != null) ...[
-                    AppBanner.error(
-                      message: bannerMessage,
-                      onClose: () {
-                        setState(() {
-                          _errorMessage = null;
-                        });
-                        ref.read(authNotifierProvider.notifier).clearError();
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                  ],
+                  // Error Alert Banner
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: bannerMessage != null
+                        ? Padding(
+                            key: ValueKey(bannerMessage),
+                            padding: const EdgeInsets.only(bottom: 18.0),
+                            child: AppBanner.error(
+                              message: bannerMessage,
+                              onClose: () {
+                                setState(() {
+                                  _localError = null;
+                                });
+                                ref.read(authNotifierProvider.notifier).clearError();
+                              },
+                            ),
+                          )
+                        : const SizedBox.shrink(key: ValueKey('emptyBanner')),
+                  ),
 
                   // Email Address field
                   AppTextField(
@@ -144,11 +136,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     controller: _emailController,
                     prefixIcon: Icons.mail_outline_rounded,
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
                     onChanged: (_) {
-                      if (_errorMessage != null) {
+                      if (_localError != null) {
                         setState(() {
-                          _errorMessage = null;
+                          _localError = null;
                         });
+                      }
+                      if (authState.status == AuthStatus.error) {
+                        ref.read(authNotifierProvider.notifier).clearError();
                       }
                     },
                   ),
@@ -165,19 +161,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _handleSignIn(),
                     onChanged: (_) {
-                      if (_errorMessage != null) {
+                      if (_localError != null) {
                         setState(() {
-                          _errorMessage = null;
+                          _localError = null;
                         });
+                      }
+                      if (authState.status == AuthStatus.error) {
+                        ref.read(authNotifierProvider.notifier).clearError();
                       }
                     },
                   ),
                   const SizedBox(height: 24),
 
-                  // "Sign In  →" Button
+                  // "Sign In" Button
                   AppButton(
                     text: 'Sign In',
-                    isLoading: _isLoading,
+                    isLoading: isLoading,
                     onPressed: _handleSignIn,
                   ),
                   const SizedBox(height: 18),

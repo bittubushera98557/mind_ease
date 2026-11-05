@@ -51,16 +51,24 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final currentLocation = state.location;
       final isAuthRoute = currentLocation == RouteNames.signIn ||
           currentLocation == RouteNames.signUp ||
-          currentLocation == RouteNames.forgotPassword;
+          currentLocation == RouteNames.forgotPassword ||
+          currentLocation == RouteNames.welcome;
 
       // While checking initial auth state, remain on splash or requested page
       if (authState.status == AuthStatus.initial || authState.status == AuthStatus.loading) {
         return null;
       }
 
-      // If user is authenticated and trying to access sign-in or sign-up, redirect to dashboard
+      // If user is authenticated and trying to access welcome, sign-in, or sign-up, redirect to dashboard
       if (authState.status == AuthStatus.authenticated && isAuthRoute) {
         return RouteNames.dashboard;
+      }
+
+      // If user is unauthenticated and attempting to access a protected route, redirect to sign in
+      if (authState.status == AuthStatus.unauthenticated &&
+          !isAuthRoute &&
+          currentLocation != RouteNames.splash) {
+        return RouteNames.signIn;
       }
 
       return null;
@@ -209,14 +217,34 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.phaseDetail,
         pageBuilder: (context, state) {
-          final phase = state.extra as ProgramPhaseModel?;
+          ProgramPhaseModel? phase;
+          int phaseNumber = 1;
+          String? programId;
+
+          if (state.extra is ProgramPhaseModel) {
+            phase = state.extra as ProgramPhaseModel;
+            phaseNumber = phase.number > 0 ? phase.number : 1;
+          } else if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            if (map['phase'] is ProgramPhaseModel) {
+              phase = map['phase'] as ProgramPhaseModel;
+            }
+            if (map['phaseNumber'] is int) {
+              phaseNumber = map['phaseNumber'] as int;
+            }
+            if (map['programId'] is String) {
+              programId = map['programId'] as String;
+            }
+          }
+
           return _buildPage(
             PhaseDetailScreen(
               phase: phase,
-              phaseNumber: phase?.number ?? 1,
+              phaseNumber: phaseNumber,
               phaseTitle: phase?.title.isNotEmpty == true
                   ? phase!.title
                   : "How's Your Head, Really?",
+              programId: programId,
             ),
             state,
           );
@@ -261,7 +289,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.phaseQuiz,
-        pageBuilder: (context, state) => _buildPage(const PhaseQuizScreen(), state),
+        pageBuilder: (context, state) {
+          PhaseQuizModel? quiz;
+          int phaseNumber = 1;
+          String? programId;
+          String? phaseId;
+
+          if (state.extra is PhaseQuizModel) {
+            quiz = state.extra as PhaseQuizModel;
+          } else if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            if (map['quiz'] is PhaseQuizModel) {
+              quiz = map['quiz'] as PhaseQuizModel;
+            }
+            if (map['phaseNumber'] is int) {
+              phaseNumber = map['phaseNumber'] as int;
+            }
+            if (map['programId'] is String) {
+              programId = map['programId'] as String;
+            }
+            if (map['phaseId'] is String) {
+              phaseId = map['phaseId'] as String;
+            }
+          }
+
+          return _buildPage(
+            PhaseQuizScreen(
+              quiz: quiz,
+              phaseNumber: phaseNumber,
+              programId: programId,
+              phaseId: phaseId,
+            ),
+            state,
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.lessonDetail,

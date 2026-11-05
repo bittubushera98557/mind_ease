@@ -159,8 +159,7 @@ class ProfileScreen extends ConsumerWidget {
                         title: 'Sign out',
                         titleColor: AppColors.textPrimary,
                         onTap: () {
-                          context.go(RouteNames.signIn);
-                          ref.read(authNotifierProvider.notifier).logout();
+                          _showSignOutConfirmationDialog(context, ref);
                         },
                       ),
                     ]),
@@ -485,6 +484,111 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  void _showSignOutConfirmationDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        bool isLoggingOut = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                'Sign Out',
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              content: Text(
+                'Are you sure you want to sign out?',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13.5,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              actions: [
+                TextButton(
+                  onPressed: isLoggingOut
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isLoggingOut
+                      ? null
+                      : () async {
+                          setState(() {
+                            isLoggingOut = true;
+                          });
+
+                          final navigator = Navigator.of(dialogContext);
+                          final router = GoRouter.of(context);
+
+                          if (navigator.mounted && navigator.canPop()) {
+                            navigator.pop();
+                          }
+
+                          await ref.read(authNotifierProvider.notifier).logout();
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            router.go(RouteNames.signIn);
+                          });
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  child: isLoggingOut
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          'Sign Out',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showDeleteAccountConfirmationDialog(
     BuildContext context,
     WidgetRef ref,
@@ -548,12 +652,15 @@ class ProfileScreen extends ConsumerWidget {
                               .read(authNotifierProvider.notifier)
                               .deleteAccount();
 
-                          try {
+                          if (navigator.mounted && navigator.canPop()) {
                             navigator.pop();
-                          } catch (_) {}
+                          }
 
                           if (success) {
-                            router.go(RouteNames.signIn);
+                            WidgetsBinding.instance
+                                .addPostFrameCallback((_) {
+                              router.go(RouteNames.signIn);
+                            });
                           } else {
                             scaffoldMessenger.showSnackBar(
                               const SnackBar(

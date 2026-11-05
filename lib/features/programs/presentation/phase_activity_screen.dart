@@ -268,7 +268,7 @@ class _PhaseActivityScreenState extends State<PhaseActivityScreen> {
                       child: Text(
                         'Save draft',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
@@ -292,7 +292,7 @@ class _PhaseActivityScreenState extends State<PhaseActivityScreen> {
                       child: Text(
                         'Complete activity',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),

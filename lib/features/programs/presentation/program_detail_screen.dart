@@ -143,7 +143,7 @@ class ProgramDetailScreen extends ConsumerWidget {
                             if (isFirstOrUnlocked) {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12.0),
-                                child: _buildActivePhaseCard(context, phase),
+                                child: _buildActivePhaseCard(context, phase, programId: detail.id),
                               );
                             } else {
                               final prevNumber =
@@ -466,7 +466,11 @@ class ProgramDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildActivePhaseCard(BuildContext context, ProgramPhaseModel phase) {
+  Widget _buildActivePhaseCard(
+    BuildContext context,
+    ProgramPhaseModel phase, {
+    String? programId,
+  }) {
     final phaseNum = phase.number > 0 ? phase.number : 1;
     final totalItems = phase.lessons.length +
         phase.videos.length +
@@ -475,7 +479,14 @@ class ProgramDetailScreen extends ConsumerWidget {
     final totalDisplay = totalItems > 0 ? totalItems : 8;
 
     return GestureDetector(
-      onTap: () => context.push(RouteNames.phaseDetail, extra: phase),
+      onTap: () => context.push(
+        RouteNames.phaseDetail,
+        extra: {
+          'phase': phase,
+          'programId': programId,
+          'phaseNumber': phaseNum,
+        },
+      ),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
@@ -591,11 +602,11 @@ class ProgramDetailScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
+              child: const LinearProgressIndicator(
                 value: 0.0,
                 minHeight: 5,
-                backgroundColor: const Color(0xFFE8E2DA),
-                valueColor: const AlwaysStoppedAnimation<Color>(
+                backgroundColor: Color(0xFFE8E2DA),
+                valueColor: AlwaysStoppedAnimation<Color>(
                   AppColors.primary,
                 ),
               ),
@@ -624,7 +635,13 @@ class ProgramDetailScreen extends ConsumerWidget {
     required String unlockMessage,
   }) {
     return GestureDetector(
-      onTap: () => context.push(RouteNames.phaseDetail, extra: phase),
+      onTap: () => context.push(
+        RouteNames.phaseDetail,
+        extra: {
+          if (phase != null) 'phase': phase,
+          'phaseNumber': number,
+        },
+      ),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(

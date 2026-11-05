@@ -50,11 +50,11 @@ class AppColors {
   static const Color inputSuffixIcon = Color(0xFF9E958E);
 
   // Mood Faces (Welcome Screen)
-  static const Color moodCalm = Color(0xFF98AA7D);
-  static const Color moodHappy = Color(0xFFF5C558);
-  static const Color moodNeutral = Color(0xFFCBB29E);
-  static const Color moodSad = Color(0xFFE17357);
-  static const Color moodWorried = Color(0xFFA39CFE);
+  static const Color moodCalm = Color(0xFF8EA968);
+  static const Color moodHappy = Color(0xFFF9C84E);
+  static const Color moodNeutral = Color(0xFFBCA394);
+  static const Color moodSad = Color(0xFFE86F2C);
+  static const Color moodWorried = Color(0xFFA093F0);
 
   // Logo Palette
   static const Color logoCoral = Color(0xFFE76F51);

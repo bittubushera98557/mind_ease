@@ -170,16 +170,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> updateProfile({
     required String firstName,
     required String lastName,
+    String? preferredName,
     required String email,
     String? mobile,
+    bool? remindersEnabled,
+    bool? removePhoto,
     File? photoFile,
   }) async {
     try {
       final updatedUser = await _repository.updateProfile(
         firstName: firstName,
         lastName: lastName,
+        preferredName: preferredName,
         email: email,
         mobile: mobile,
+        remindersEnabled: remindersEnabled,
+        removePhoto: removePhoto,
         photoFile: photoFile,
       );
 
@@ -199,7 +205,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           lastName: lastName,
           email: newEmail,
           mobile: mobile,
-          photo: updatedUser.photo ?? current?.photo,
+          photo: removePhoto == true ? null : (updatedUser.photo ?? current?.photo),
           createdAt: current?.createdAt ?? updatedUser.createdAt,
         ),
       );

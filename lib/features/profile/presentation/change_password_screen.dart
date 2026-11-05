@@ -145,7 +145,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             backgroundColor: AppColors.primary,
           ),
         );
-        context.pop();
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go(RouteNames.dashboard, extra: 3);
+        }
       } else {
         final authState = ref.read(authStateProvider);
         final errorMsg = authState.loginErrorMessage ??
@@ -176,7 +180,13 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 children: [
                   CircularBackButton(
                     isLightOnDark: false,
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go(RouteNames.dashboard, extra: 3);
+                      }
+                    },
                   ),
                   const Expanded(
                     child: Center(

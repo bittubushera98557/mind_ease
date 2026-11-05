@@ -5,9 +5,10 @@ import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/services/secure_storage_service.dart';
 import '../models/auth_response_model.dart';
+import '../models/token_refresh_response_model.dart';
 import '../models/user_model.dart';
 
-/// Auth Repository using Dio and Secure Storage
+/// Auth Repository using Dio, Secure Storage, and SharedPreferences
 class AuthRepository {
   final DioClient _dioClient;
   final SecureStorageService _storageService;
@@ -37,13 +38,17 @@ class AuthRepository {
 
     if (response.data != null) {
       final authData = response.data!;
-      // Save tokens and user info securely via FlutterSecureStorage
+      // Save tokens and user info securely via FlutterSecureStorage & SharedPreferences
       await _storageService.saveAccessToken(authData.accessToken);
       await _storageService.saveRefreshToken(authData.refreshToken);
       await _storageService.saveUserData(
         id: authData.user.id,
         name: authData.user.name,
         email: authData.user.email,
+        firstName: authData.user.firstName,
+        lastName: authData.user.lastName,
+        mobile: authData.user.mobile,
+        photo: authData.user.photo,
         createdAt: authData.user.createdAt,
       );
 
@@ -70,13 +75,17 @@ class AuthRepository {
 
     if (response.data != null) {
       final authData = response.data!;
-      // Save tokens and user info securely via FlutterSecureStorage
+      // Save tokens and user info securely via FlutterSecureStorage & SharedPreferences
       await _storageService.saveAccessToken(authData.accessToken);
       await _storageService.saveRefreshToken(authData.refreshToken);
       await _storageService.saveUserData(
         id: authData.user.id,
         name: authData.user.name,
         email: authData.user.email,
+        firstName: authData.user.firstName,
+        lastName: authData.user.lastName,
+        mobile: authData.user.mobile,
+        photo: authData.user.photo,
         createdAt: authData.user.createdAt,
       );
 
@@ -90,17 +99,55 @@ class AuthRepository {
     return await _storageService.getAccessToken();
   }
 
+  /// Calls POST /auth/refresh with refreshToken and updates stored tokens.
+  Future<bool> refreshToken() async {
+    final refreshToken = await _storageService.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+
+    try {
+      final response = await _dioClient.post<TokenRefreshResponseModel>(
+        ApiEndpoints.tokenRefresh,
+        body: {'refreshToken': refreshToken},
+        fromJson: (json) => TokenRefreshResponseModel.fromJson(
+          json is Map<String, dynamic> && json.containsKey('data') && json['data'] is Map<String, dynamic>
+              ? json['data'] as Map<String, dynamic>
+              : json,
+        ),
+      );
+
+      if (response.data != null && response.data!.isSuccess) {
+        await _storageService.saveAccessToken(response.data!.accessToken);
+        if (response.data!.refreshToken.isNotEmpty) {
+          await _storageService.saveRefreshToken(response.data!.refreshToken);
+        }
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   Future<UserModel?> getStoredUser() async {
     final id = await _storageService.getUserId();
     final name = await _storageService.getUserName();
     final email = await _storageService.getUserEmail();
     final createdAt = await _storageService.getUserCreatedAt();
+    final firstName = await _storageService.getUserFirstName();
+    final lastName = await _storageService.getUserLastName();
+    final mobile = await _storageService.getUserMobile();
+    final photo = await _storageService.getUserPhoto();
 
-    if (id != null && email != null) {
+    if ((id != null && id.isNotEmpty) || (email != null && email.isNotEmpty)) {
+      final validName = (name != null && name.isNotEmpty)
+          ? name
+          : ('$firstName $lastName'.trim().isNotEmpty ? '$firstName $lastName'.trim() : 'User');
       return UserModel(
-        id: id,
-        name: name ?? '',
-        email: email,
+        id: id ?? 'user_id',
+        name: validName,
+        firstName: firstName,
+        lastName: lastName,
+        email: email ?? '',
+        mobile: mobile,
+        photo: photo,
         createdAt: createdAt,
       );
     }
@@ -141,12 +188,15 @@ class AuthRepository {
     }
   }
 
-  /// Updates user profile details via PATCH /me as multipart/form-data
+  /// Updates user profile details via POST /me as multipart/form-data
   Future<UserModel> updateProfile({
     required String firstName,
     required String lastName,
+    String? preferredName,
     required String email,
     String? mobile,
+    bool? remindersEnabled,
+    bool? removePhoto,
     File? photoFile,
   }) async {
     final Map<String, dynamic> formMap = {
@@ -155,8 +205,20 @@ class AuthRepository {
       'email': email,
     };
 
+    if (preferredName != null && preferredName.isNotEmpty) {
+      formMap['preferredName'] = preferredName;
+    }
+
     if (mobile != null && mobile.isNotEmpty) {
       formMap['mobile'] = mobile;
+    }
+
+    if (remindersEnabled != null) {
+      formMap['remindersEnabled'] = remindersEnabled;
+    }
+
+    if (removePhoto != null) {
+      formMap['removePhoto'] = removePhoto;
     }
 
     if (photoFile != null) {
@@ -169,7 +231,7 @@ class AuthRepository {
 
     final formData = FormData.fromMap(formMap);
 
-    final response = await _dioClient.patch<UserModel>(
+    final response = await _dioClient.post<UserModel>(
       ApiEndpoints.currentUser,
       body: formData,
       fromJson: (json) {
@@ -199,6 +261,10 @@ class AuthRepository {
         id: updatedUser.id,
         name: fullName,
         email: updatedUser.email.isNotEmpty ? updatedUser.email : email,
+        firstName: updatedUser.firstName ?? firstName,
+        lastName: updatedUser.lastName ?? lastName,
+        mobile: updatedUser.mobile ?? mobile,
+        photo: updatedUser.photo,
         createdAt: updatedUser.createdAt,
       );
       return updatedUser;
@@ -209,8 +275,18 @@ class AuthRepository {
       id: '',
       name: fallbackName,
       email: email,
+      firstName: firstName,
+      lastName: lastName,
+      mobile: mobile,
     );
-    return UserModel(id: '', name: fallbackName, email: email);
+    return UserModel(
+      id: '',
+      name: fallbackName,
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      mobile: mobile,
+    );
   }
 
   /// Deletes user profile photo via DELETE /me/photo
@@ -237,6 +313,10 @@ class AuthRepository {
         id: updatedUser.id,
         name: updatedUser.name,
         email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        mobile: updatedUser.mobile,
+        photo: null,
         createdAt: updatedUser.createdAt,
       );
       return updatedUser;

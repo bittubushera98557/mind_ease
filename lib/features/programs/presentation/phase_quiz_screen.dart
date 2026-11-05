@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/program_detail_response_model.dart';
+import 'providers/programs_provider.dart';
 
 enum _QuizScreenMode { intro, question, results }
 
@@ -28,21 +31,25 @@ class _QuizQuestionData {
 }
 
 /// Phase Quiz Screen dynamically rendering phase quiz from GET /programs/{programId}
-class PhaseQuizScreen extends StatefulWidget {
+class PhaseQuizScreen extends ConsumerStatefulWidget {
   final PhaseQuizModel? quiz;
   final int phaseNumber;
+  final String? programId;
+  final String? phaseId;
 
   const PhaseQuizScreen({
     Key? key,
     this.quiz,
     this.phaseNumber = 1,
+    this.programId,
+    this.phaseId,
   }) : super(key: key);
 
   @override
-  State<PhaseQuizScreen> createState() => _PhaseQuizScreenState();
+  ConsumerState<PhaseQuizScreen> createState() => _PhaseQuizScreenState();
 }
 
-class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
+class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
   _QuizScreenMode _mode = _QuizScreenMode.intro;
   int _currentQuestionIndex = 0;
   int? _selectedOptionIndex;
@@ -128,9 +135,9 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
     ),
   ];
 
-  List<_QuizQuestionData> get _questions {
-    if (widget.quiz != null && widget.quiz!.questions.isNotEmpty) {
-      return widget.quiz!.questions.asMap().entries.map((entry) {
+  List<_QuizQuestionData> _getQuestions(PhaseQuizModel? activeQuiz) {
+    if (activeQuiz != null && activeQuiz.questions.isNotEmpty) {
+      return activeQuiz.questions.asMap().entries.map((entry) {
         final idx = entry.key;
         final q = entry.value;
         return _QuizQuestionData(
@@ -150,7 +157,21 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
     return _defaultQuestionsBank;
   }
 
-  int get _passThresholdPercentage => widget.quiz?.passThreshold ?? 80;
+  ProgramPhaseModel? _findPhase(List<ProgramPhaseModel> phases) {
+    if (phases.isEmpty) return null;
+    if (widget.phaseId != null && widget.phaseId!.isNotEmpty) {
+      for (final p in phases) {
+        if (p.id == widget.phaseId) return p;
+      }
+    }
+    for (final p in phases) {
+      if (p.number == widget.phaseNumber) return p;
+    }
+    if (widget.phaseNumber > 0 && widget.phaseNumber <= phases.length) {
+      return phases[widget.phaseNumber - 1];
+    }
+    return phases.first;
+  }
 
   void _startQuiz() {
     setState(() {
@@ -162,10 +183,10 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
     });
   }
 
-  void _submitAnswer() {
+  void _submitAnswer(List<_QuizQuestionData> questions) {
     if (_selectedOptionIndex == null || _isSubmitted) return;
 
-    final q = _questions[_currentQuestionIndex];
+    final q = questions[_currentQuestionIndex];
     final isCorrect = _selectedOptionIndex == q.correctIndex;
 
     setState(() {
@@ -176,8 +197,8 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
     });
   }
 
-  void _nextQuestion() {
-    if (_currentQuestionIndex < _questions.length - 1) {
+  void _nextQuestion(int totalQuestions) {
+    if (_currentQuestionIndex < totalQuestions - 1) {
       setState(() {
         _currentQuestionIndex++;
         _selectedOptionIndex = null;
@@ -195,33 +216,168 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
     _startQuiz();
   }
 
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(RouteNames.dashboard);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: _buildCurrentModeScreen(),
+    if (widget.quiz != null && widget.quiz!.questions.isNotEmpty) {
+      return _buildQuizContent(widget.quiz);
+    }
+
+    if (widget.programId != null && widget.programId!.isNotEmpty) {
+      final detailAsync = ref.watch(programDetailProvider(widget.programId!));
+
+      return detailAsync.when(
+        data: (detail) {
+          final activePhase = _findPhase(detail.phases);
+          final activeQuiz = activePhase?.quiz ?? widget.quiz;
+          return _buildQuizContent(activeQuiz);
+        },
+        loading: () => Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildHeaderBar(),
+                const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        error: (err, stack) => Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildHeaderBar(),
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            size: 48,
+                            color: AppColors.alertErrorText,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Failed to load quiz questions',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            err.toString(),
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              ref.invalidate(programDetailProvider(widget.programId!));
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                            ),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return _buildQuizContent(widget.quiz);
+  }
+
+  Widget _buildHeaderBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Row(
+        children: [
+          CircularBackButton(
+            isLightOnDark: false,
+            onPressed: _handleBack,
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                'PHASE ${widget.phaseNumber} - QUIZ',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.4,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 40),
+        ],
       ),
     );
   }
 
-  Widget _buildCurrentModeScreen() {
+  Widget _buildQuizContent(PhaseQuizModel? activeQuiz) {
+    final questions = _getQuestions(activeQuiz);
+    final passThreshold = activeQuiz?.passThreshold ?? 80;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: _buildCurrentModeScreen(questions, passThreshold),
+      ),
+    );
+  }
+
+  Widget _buildCurrentModeScreen(
+    List<_QuizQuestionData> questions,
+    int passThreshold,
+  ) {
     switch (_mode) {
       case _QuizScreenMode.intro:
-        return _buildIntroScreen();
+        return _buildIntroScreen(questions, passThreshold);
       case _QuizScreenMode.question:
-        return _buildQuestionScreen();
+        return _buildQuestionScreen(questions);
       case _QuizScreenMode.results:
-        return _buildResultsScreen();
+        return _buildResultsScreen(questions, passThreshold);
     }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 1. INTRO SCREEN
   // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildIntroScreen() {
-    final questionsList = _questions;
-    final passMarkNeeded = ((_passThresholdPercentage / 100) * questionsList.length).ceil();
+  Widget _buildIntroScreen(
+    List<_QuizQuestionData> questionsList,
+    int passThreshold,
+  ) {
+    final passMarkNeeded =
+        ((passThreshold / 100) * questionsList.length).ceil();
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -233,7 +389,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
             children: [
               CircularBackButton(
                 isLightOnDark: false,
-                onPressed: () => context.pop(),
+                onPressed: _handleBack,
               ),
               Expanded(
                 child: Center(
@@ -312,7 +468,8 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
                 ),
-                _buildStatRow('Pass mark', '$_passThresholdPercentage% ($passMarkNeeded of ${questionsList.length})'),
+                _buildStatRow('Pass mark',
+                    '$passThreshold% ($passMarkNeeded of ${questionsList.length})'),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
@@ -336,8 +493,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   // ═══════════════════════════════════════════════════════════════════════════
   // 2. ACTIVE QUESTION SCREEN
   // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildQuestionScreen() {
-    final questionsList = _questions;
+  Widget _buildQuestionScreen(List<_QuizQuestionData> questionsList) {
     final q = questionsList[_currentQuestionIndex];
     final total = questionsList.length;
     final progressVal = (_currentQuestionIndex + 1) / total;
@@ -346,7 +502,8 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
       children: [
         // Top bar
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
           child: Row(
             children: [
               CircularBackButton(
@@ -371,7 +528,8 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(20),
@@ -399,7 +557,8 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
               value: progressVal,
               minHeight: 4,
               backgroundColor: const Color(0xFFE8E2DA),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(AppColors.primary),
             ),
           ),
         ),
@@ -460,14 +619,16 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
           child: _isSubmitted
               ? AppButton(
                   text: 'Next question \u2192',
-                  onPressed: _nextQuestion,
+                  onPressed: () => _nextQuestion(total),
                 )
               : AppButton(
                   text: 'Submit answer',
                   backgroundColor: _selectedOptionIndex != null
                       ? AppColors.primary
                       : const Color(0xFFD0CBC6),
-                  onPressed: _selectedOptionIndex != null ? _submitAnswer : null,
+                  onPressed: _selectedOptionIndex != null
+                      ? () => _submitAnswer(questionsList)
+                      : null,
                 ),
         ),
       ],
@@ -538,7 +699,10 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: isSelected || (_isSubmitted && isCorrect) ? 1.5 : 1.0),
+        border: Border.all(
+          color: borderColor,
+          width: isSelected || (_isSubmitted && isCorrect) ? 1.5 : 1.0,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -579,8 +743,10 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
 
   Widget _buildFeedbackBanner(_QuizQuestionData q) {
     final isCorrect = _selectedOptionIndex == q.correctIndex;
-    final bannerBg = isCorrect ? const Color(0xFFF1F8EE) : const Color(0xFFFDF1F0);
-    final headerColor = isCorrect ? const Color(0xFF3B6E2B) : const Color(0xFFB33A27);
+    final bannerBg =
+        isCorrect ? const Color(0xFFF1F8EE) : const Color(0xFFFDF1F0);
+    final headerColor =
+        isCorrect ? const Color(0xFF3B6E2B) : const Color(0xFFB33A27);
     final headerText = isCorrect ? 'Correct' : 'Not quite';
     final bodyText = isCorrect ? q.feedbackCorrect : q.feedbackIncorrect;
 
@@ -620,11 +786,13 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
   // ═══════════════════════════════════════════════════════════════════════════
   // 3. RESULTS SCREEN
   // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildResultsScreen() {
-    final questionsList = _questions;
+  Widget _buildResultsScreen(
+    List<_QuizQuestionData> questionsList,
+    int passThreshold,
+  ) {
     final total = questionsList.length;
     final percentage = ((_score / total) * 100).round();
-    final isPassed = percentage >= _passThresholdPercentage;
+    final isPassed = percentage >= passThreshold;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -636,7 +804,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
             children: [
               CircularBackButton(
                 isLightOnDark: false,
-                onPressed: () => context.pop(),
+                onPressed: _handleBack,
               ),
               Expanded(
                 child: Center(
@@ -671,7 +839,9 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
                     strokeWidth: 12,
                     backgroundColor: const Color(0xFFEFECE8),
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      isPassed ? const Color(0xFF7CA95B) : const Color(0xFFE57324),
+                      isPassed
+                          ? const Color(0xFF7CA95B)
+                          : const Color(0xFFE57324),
                     ),
                   ),
                 ),
@@ -705,7 +875,9 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: isPassed ? const Color(0xFFE2F0D9) : const Color(0xFFFFF3CD),
+              color: isPassed
+                  ? const Color(0xFFE2F0D9)
+                  : const Color(0xFFFFF3CD),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -713,7 +885,9 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: isPassed ? const Color(0xFF3B6E2B) : const Color(0xFF856404),
+                color: isPassed
+                    ? const Color(0xFF3B6E2B)
+                    : const Color(0xFF856404),
               ),
             ),
           ),
@@ -734,7 +908,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
             child: Text(
               isPassed
                   ? 'You passed the quiz! You\'re ready to move forward in your program.'
-                  : 'You need $_passThresholdPercentage% to pass. Have another look at the lessons, then try again. There\'s no limit on attempts.',
+                  : 'You need $passThreshold% to pass. Have another look at the lessons, then try again. There\'s no limit on attempts.',
               textAlign: TextAlign.center,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13.5,
@@ -773,7 +947,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
                 ),
-                _buildStatRow('Pass mark', '$_passThresholdPercentage%'),
+                _buildStatRow('Pass mark', '$passThreshold%'),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Divider(height: 1, color: Color(0xFFF4EFEA)),
@@ -790,7 +964,8 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _retryQuiz,
-                  icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.textPrimary),
+                  icon: const Icon(Icons.refresh_rounded,
+                      size: 18, color: AppColors.textPrimary),
                   label: Text(
                     'Retry',
                     style: GoogleFonts.plusJakartaSans(
@@ -811,7 +986,7 @@ class _PhaseQuizScreenState extends State<PhaseQuizScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => context.pop(),
+                  onPressed: _handleBack,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     elevation: 0,

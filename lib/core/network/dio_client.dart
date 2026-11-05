@@ -1,15 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
+import '../../features/auth/data/models/token_refresh_response_model.dart';
 import '../config/env_config.dart';
 import '../services/secure_storage_service.dart';
+import 'api_endpoints.dart';
 import 'api_exception.dart';
 import 'api_response.dart';
 
-/// MindEase Centralized Dio API Client
+/// MindEase Centralized Dio API Client with Auto Token Refresh
 class DioClient {
   late final Dio dio;
   final SecureStorageService _storageService;
+  Completer<bool>? _refreshTokenCompleter;
 
   DioClient({
     Dio? dioOverride,
@@ -57,14 +61,123 @@ class DioClient {
           }
           return handler.next(response);
         },
-        onError: (DioException error, handler) {
+        onError: (DioException error, handler) async {
           if (EnvConfig.instance.enableLogging) {
-            developer.log('ERROR [DIO] [${error.response?.statusCode}] ${error.requestOptions.uri}: ${error.message}', name: 'MindEase.DioClient');
+            developer.log(
+              'ERROR [DIO] [${error.response?.statusCode}] ${error.requestOptions.uri}: ${error.message}',
+              name: 'MindEase.DioClient',
+            );
           }
+
+          final is401 = error.response?.statusCode == 401;
+          final isAuthEndpoint = error.requestOptions.path.contains('/auth/login') ||
+              error.requestOptions.path.contains('/auth/register') ||
+              error.requestOptions.path.contains('/auth/refresh') ||
+              error.requestOptions.path.contains('/auth/forgot-password');
+
+          if (is401 && !isAuthEndpoint) {
+            final success = await _handleTokenRefresh();
+            if (success) {
+              try {
+                final newToken = await _storageService.getAccessToken();
+                final opts = error.requestOptions;
+                if (newToken != null && newToken.isNotEmpty) {
+                  opts.headers['Authorization'] = 'Bearer $newToken';
+                }
+                final clonedResponse = await dio.fetch(opts);
+                return handler.resolve(clonedResponse);
+              } catch (retryError) {
+                if (retryError is DioException) {
+                  return handler.next(retryError);
+                }
+              }
+            }
+          }
+
           return handler.next(error);
         },
       ),
     );
+  }
+
+  Future<bool> _handleTokenRefresh() async {
+    if (_refreshTokenCompleter != null) {
+      return _refreshTokenCompleter!.future;
+    }
+
+    _refreshTokenCompleter = Completer<bool>();
+    try {
+      final success = await _performTokenRefresh();
+      _refreshTokenCompleter!.complete(success);
+      return success;
+    } catch (e) {
+      _refreshTokenCompleter!.complete(false);
+      return false;
+    } finally {
+      _refreshTokenCompleter = null;
+    }
+  }
+
+  Future<bool> _performTokenRefresh() async {
+    final refreshToken = await _storageService.getRefreshToken();
+    if (refreshToken == null || refreshToken.trim().isEmpty) {
+      return false;
+    }
+
+    try {
+      final config = EnvConfig.instance;
+      final refreshDio = Dio(
+        BaseOptions(
+          baseUrl: config.apiBaseUrl,
+          connectTimeout: config.apiTimeout,
+          receiveTimeout: config.apiTimeout,
+          sendTimeout: config.apiTimeout,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      final response = await refreshDio.post(
+        ApiEndpoints.tokenRefresh,
+        data: {'refreshToken': refreshToken},
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        dynamic decoded = response.data;
+        if (decoded is String && decoded.trim().startsWith('{')) {
+          try {
+            decoded = jsonDecode(decoded);
+          } catch (_) {}
+        }
+
+        if (decoded is Map<String, dynamic>) {
+          Map<String, dynamic> responseJson = decoded;
+          if (decoded.containsKey('data') && decoded['data'] is Map<String, dynamic>) {
+            responseJson = decoded['data'] as Map<String, dynamic>;
+          }
+
+          final refreshModel = TokenRefreshResponseModel.fromJson(responseJson);
+          if (refreshModel.isSuccess) {
+            await _storageService.saveAccessToken(refreshModel.accessToken);
+            if (refreshModel.refreshToken.isNotEmpty) {
+              await _storageService.saveRefreshToken(refreshModel.refreshToken);
+            }
+            if (EnvConfig.instance.enableLogging) {
+              developer.log('Successfully refreshed access token', name: 'MindEase.DioClient');
+            }
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      if (EnvConfig.instance.enableLogging) {
+        developer.log('Token refresh failed: $e', name: 'MindEase.DioClient');
+      }
+    }
+
+    return false;
   }
 
   ApiException _handleDioError(DioException error) {

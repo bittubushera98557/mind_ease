@@ -23,10 +23,10 @@ class SignUpScreen extends ConsumerStatefulWidget {
 class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  late final TextEditingController _nameController;
-  late final TextEditingController _emailController;
-  late final TextEditingController _passwordController;
-  late final TextEditingController _confirmPasswordController;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   // Field validation errors
   String? _nameError;
@@ -38,10 +38,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _emailController = TextEditingController();
-    _passwordController = TextEditingController();
-    _confirmPasswordController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authNotifierProvider.notifier).clearError();
+    });
   }
 
   @override
@@ -61,7 +60,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    final emailRegex = RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$');
 
     setState(() {
       if (name.isEmpty) {
@@ -106,6 +105,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   Future<void> _handleSignUp() async {
+    // Dismiss soft/hardware keyboard cleanly before processing submission
+    FocusManager.instance.primaryFocus?.unfocus();
+
     setState(() {
       _bannerError = null;
     });
@@ -148,7 +150,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final isLoading = authState.status == AuthStatus.loading;
-    final bannerMessage = _bannerError ?? (authState.status == AuthStatus.error ? authState.signUpErrorMessage : null);
+    final bannerMessage = _bannerError ??
+        (authState.status == AuthStatus.error ? authState.signUpErrorMessage : null);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -158,7 +161,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             // Top Terracotta Curved Wave Header with Back Button and Logo
             CurvedHeader(
               height: 140,
-              onBack: () => context.pop(),
+              onBack: () {
+                ref.read(authNotifierProvider.notifier).clearError();
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go(RouteNames.welcome);
+                }
+              },
             ),
 
             Padding(
@@ -178,18 +188,24 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     const SizedBox(height: 20),
 
                     // Error Alert Banner
-                    if (bannerMessage != null) ...[
-                      AppBanner.error(
-                        message: bannerMessage,
-                        onClose: () {
-                          setState(() {
-                            _bannerError = null;
-                          });
-                          ref.read(authNotifierProvider.notifier).clearError();
-                        },
-                      ),
-                      const SizedBox(height: 18),
-                    ],
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: bannerMessage != null
+                          ? Padding(
+                              key: ValueKey(bannerMessage),
+                              padding: const EdgeInsets.only(bottom: 18.0),
+                              child: AppBanner.error(
+                                message: bannerMessage,
+                                onClose: () {
+                                  setState(() {
+                                    _bannerError = null;
+                                  });
+                                  ref.read(authNotifierProvider.notifier).clearError();
+                                },
+                              ),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('emptyBanner')),
+                    ),
 
                     // Your Name field
                     AppTextField(
@@ -198,6 +214,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       hintText: 'Enter your name',
                       controller: _nameController,
                       prefixIcon: Icons.person_outline_rounded,
+                      textInputAction: TextInputAction.next,
                       errorText: _nameError,
                       state: _nameError != null
                           ? AppTextFieldState.error
@@ -207,6 +224,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           setState(() {
                             _nameError = null;
                           });
+                        }
+                        if (authState.status == AuthStatus.error) {
+                          ref.read(authNotifierProvider.notifier).clearError();
                         }
                       },
                     ),
@@ -220,6 +240,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       controller: _emailController,
                       prefixIcon: Icons.mail_outline_rounded,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       errorText: _emailError,
                       state: _emailError != null
                           ? AppTextFieldState.error
@@ -229,6 +250,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           setState(() {
                             _emailError = null;
                           });
+                        }
+                        if (authState.status == AuthStatus.error) {
+                          ref.read(authNotifierProvider.notifier).clearError();
                         }
                       },
                     ),
@@ -242,6 +266,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       controller: _passwordController,
                       isPassword: true,
                       prefixIcon: Icons.lock_outline_rounded,
+                      textInputAction: TextInputAction.next,
                       errorText: _passwordError,
                       state: _passwordError != null
                           ? AppTextFieldState.error
@@ -251,6 +276,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           setState(() {
                             _passwordError = null;
                           });
+                        }
+                        if (authState.status == AuthStatus.error) {
+                          ref.read(authNotifierProvider.notifier).clearError();
                         }
                       },
                     ),
@@ -269,14 +297,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           ? AppTextFieldState.error
                           : AppTextFieldState.normal,
                       textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _handleSignUp(),
                       onChanged: (val) {
                         if (_confirmPasswordError != null && val.trim().isNotEmpty) {
                           setState(() {
                             _confirmPasswordError = null;
                           });
                         }
+                        if (authState.status == AuthStatus.error) {
+                          ref.read(authNotifierProvider.notifier).clearError();
+                        }
                       },
-                      onSubmitted: (_) => _handleSignUp(),
                     ),
                     const SizedBox(height: 24),
 
@@ -298,6 +329,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
+                            ref.read(authNotifierProvider.notifier).clearError();
                             context.pushReplacement(RouteNames.signIn);
                           },
                           child: Text(

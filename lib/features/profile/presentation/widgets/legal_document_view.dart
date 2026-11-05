@@ -71,7 +71,13 @@ class _LegalDocumentViewState extends State<LegalDocumentView> {
                 children: [
                   CircularBackButton(
                     isLightOnDark: false,
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go(RouteNames.dashboard, extra: 3);
+                      }
+                    },
                   ),
                   Expanded(
                     child: Center(
