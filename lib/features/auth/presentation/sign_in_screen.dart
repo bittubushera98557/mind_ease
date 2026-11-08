@@ -25,7 +25,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   String? _localError;
-
+  bool _isLoading = false;
   @override
   void initState() {
     super.initState();
@@ -57,6 +57,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
     setState(() {
       _localError = null;
+      _isLoading = true;
     });
 
     final success = await ref.read(authNotifierProvider.notifier).login(
@@ -64,15 +65,30 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           password: password,
         );
 
-    if (mounted && success) {
-      context.go(RouteNames.dashboard);
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (success) {
+        _emailController.clear();
+        _passwordController.clear();
+        context.go(RouteNames.dashboard);
+      } else {
+        final authState = ref.read(authStateProvider);
+        setState(() {
+          _localError = authState.loginErrorMessage ??
+              'That email and password don\'t match. Please try again.';
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final isLoading = authState.status == AuthStatus.loading;
+    final isLoading = _isLoading || authState.status == AuthStatus.loading;
+    // final isLoading = authState.status == AuthStatus.loading;
     final bannerMessage = _localError ??
         (authState.status == AuthStatus.error ? authState.loginErrorMessage : null);
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,10 +7,11 @@ import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../../dashboard/presentation/providers/config_provider.dart';
 import '../data/models/program_detail_response_model.dart';
 
-/// Phase Watch Screen dynamically displaying phase videos
-class PhaseWatchScreen extends StatelessWidget {
+/// Phase Watch Screen dynamically displaying phase videos and using config API
+class PhaseWatchScreen extends ConsumerWidget {
   final List<PhaseVideoModel>? videos;
   final int phaseNumber;
 
@@ -42,9 +44,14 @@ class PhaseWatchScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final configAsync = ref.watch(configProvider);
+    final videoCompletePercent =
+        configAsync.valueOrNull?.videoCompletePercent ?? 90;
+
     final hasDynamicVideos = videos != null && videos!.isNotEmpty;
-    final totalVideos = hasDynamicVideos ? videos!.length : _defaultVideos.length;
+    final totalVideos =
+        hasDynamicVideos ? videos!.length : _defaultVideos.length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -93,9 +100,9 @@ class PhaseWatchScreen extends StatelessWidget {
               ),
               const SizedBox(height: 6),
 
-              // Description
+              // Description bound to Config Model's videoCompletePercent
               Text(
-                '0 of $totalVideos videos watched. A video counts once you\'ve played 90% of it.',
+                '0 of $totalVideos videos watched. A video counts once you\'ve played $videoCompletePercent% of it.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w400,
@@ -116,6 +123,7 @@ class PhaseWatchScreen extends StatelessWidget {
                       video,
                       index + 1,
                       videos!.length,
+                      videoCompletePercent,
                     ),
                   );
                 })
@@ -129,6 +137,7 @@ class PhaseWatchScreen extends StatelessWidget {
                       video,
                       index,
                       _defaultVideos.length,
+                      videoCompletePercent,
                     ),
                   );
                 }),
@@ -146,6 +155,7 @@ class PhaseWatchScreen extends StatelessWidget {
     PhaseVideoModel video,
     int videoNumber,
     int totalVideos,
+    int videoCompletePercent,
   ) {
     String durationStr = "1:12";
     if (video.duration > 0) {
@@ -166,6 +176,7 @@ class PhaseWatchScreen extends StatelessWidget {
             'videoDescription': video.description ?? '',
             'duration': durationStr,
             'mediaUrl': video.mediaUrl,
+            'videoCompletePercent': videoCompletePercent,
           },
         );
       },
@@ -244,7 +255,8 @@ class PhaseWatchScreen extends StatelessWidget {
                       height: 1.25,
                     ),
                   ),
-                  if (video.description != null && video.description!.isNotEmpty) ...[
+                  if (video.description != null &&
+                      video.description!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       video.description!,
@@ -279,6 +291,7 @@ class PhaseWatchScreen extends StatelessWidget {
     _VideoData video,
     int index,
     int total,
+    int videoCompletePercent,
   ) {
     return GestureDetector(
       onTap: () {
@@ -290,6 +303,7 @@ class PhaseWatchScreen extends StatelessWidget {
             'videoTitle': video.title,
             'videoDescription': video.description,
             'duration': video.duration,
+            'videoCompletePercent': videoCompletePercent,
           },
         );
       },

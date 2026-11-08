@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +11,9 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/appointment_model.dart';
+import '../data/models/therapists_list_resp.dart';
 import 'providers/bookings_provider.dart';
+import 'providers/therapists_provider.dart';
 
 /// 5.05 Book a Session: Step 3 of 3 – Review and Pay
 class BookingStep3ReviewPayScreen extends ConsumerStatefulWidget {
@@ -23,24 +27,229 @@ class BookingStep3ReviewPayScreen extends ConsumerStatefulWidget {
 class _BookingStep3ReviewPayScreenState
     extends ConsumerState<BookingStep3ReviewPayScreen> {
   late final TextEditingController _mobileController;
+  Timer? _holdTimer;
+  int _secondsRemaining = 60; // 10 minutes (600 seconds) countdown
 
   @override
   void initState() {
     super.initState();
     final formState = ref.read(bookingFormNotifierProvider);
     _mobileController = TextEditingController(text: formState.mobileNumber);
+    _startHoldTimer();
+  }
+
+  void _startHoldTimer() {
+    _holdTimer?.cancel();
+    _holdTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_secondsRemaining > 0) {
+        if (mounted) {
+          setState(() {
+            _secondsRemaining--;
+          });
+        }
+      } else {
+        _holdTimer?.cancel();
+        if (mounted) {
+          _showHoldExpiredDialog();
+        }
+      }
+    });
+  }
+
+  void _showHoldExpiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Hold Time Expired',
+            style: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          content: Text(
+            'Your hold time is over, so start a new booking process',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                ref.read(bookingFormNotifierProvider.notifier).resetForm();
+                context.go(RouteNames.dashboard, extra: 2);
+              },
+              child: Text(
+                'Okay',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   void dispose() {
+    _holdTimer?.cancel();
     _mobileController.dispose();
     super.dispose();
+  }
+
+  String get _formattedHoldTime {
+    final minutes = _secondsRemaining ~/ 60;
+    final seconds = _secondsRemaining % 60;
+    final secondsStr = seconds.toString().padLeft(2, '0');
+    return 'Held $minutes:$secondsStr';
+  }
+
+  String _formatFullDate(DateTime date) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    final dayName = days[date.weekday - 1];
+    final monthName = months[date.month - 1];
+    return '$dayName ${date.day} $monthName ${date.year}';
+  }
+
+  String _formatShortDate(DateTime date) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    final dayName = days[date.weekday - 1];
+    final monthName = months[date.month - 1];
+    return '$dayName ${date.day} $monthName';
+  }
+
+  String _formatDateBadge(DateTime date) {
+    const months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC'
+    ];
+    return '${months[date.month - 1]} ${date.day}';
+  }
+
+  String _formatTimeString(BookingFormState formState, TherapistModel? therapist) {
+    final tz = (therapist?.timezone != null && therapist!.timezone!.isNotEmpty)
+        ? therapist.timezone!
+        : 'AEDT';
+    if (formState.selectedSlotObj != null) {
+      final start = formState.selectedSlotObj!.startsAt;
+      final end = formState.selectedSlotObj!.endsAt;
+      final startStr = _formatHourMinute(start);
+      final endStr = _formatHourMinuteWithPeriod(end);
+      return '$startStr - $endStr $tz';
+    } else if (formState.selectedTimeSlot.isNotEmpty) {
+      return '${formState.selectedTimeSlot} $tz';
+    }
+    return '10:00 - 10:50 am $tz';
+  }
+
+  String _formatTimeStringShort(BookingFormState formState) {
+    if (formState.selectedSlotObj != null) {
+      final start = formState.selectedSlotObj!.startsAt;
+      final end = formState.selectedSlotObj!.endsAt;
+      final startStr = _formatHourMinute(start);
+      final endStr = _formatHourMinuteWithPeriod(end);
+      return '$startStr - $endStr';
+    } else if (formState.selectedTimeSlot.isNotEmpty) {
+      return formState.selectedTimeSlot;
+    }
+    return '10:00 - 10:50 am';
+  }
+
+  String _formatHourMinute(DateTime date) {
+    final hour =
+        date.hour == 0 ? 12 : (date.hour > 12 ? date.hour - 12 : date.hour);
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  String _formatHourMinuteWithPeriod(DateTime date) {
+    final hour =
+        date.hour == 0 ? 12 : (date.hour > 12 ? date.hour - 12 : date.hour);
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour >= 12 ? 'pm' : 'am';
+    return '$hour:$minute $period';
   }
 
   @override
   Widget build(BuildContext context) {
     final formState = ref.watch(bookingFormNotifierProvider);
     final formNotifier = ref.read(bookingFormNotifierProvider.notifier);
+    final therapistsAsync = ref.watch(therapistsListProvider);
+
+    final therapist = formState.selectedTherapist ??
+        (therapistsAsync.valueOrNull?.therapists.isNotEmpty == true
+            ? therapistsAsync.valueOrNull!.therapists[0]
+            : null);
+
+    final therapistName = therapist?.name ?? 'Dr Priya Nair';
+    final therapistRole = therapist?.specialties.isNotEmpty == true
+        ? therapist!.specialties.join(', ')
+        : 'Clinical Psychologist';
+    final therapistInitials = therapist?.initials ?? 'PN';
+    final therapistPhoto = therapist?.photoUrl;
+
+    final formattedDate = _formatFullDate(formState.selectedDate);
+    final formattedTime = _formatTimeString(formState, therapist);
+    final focusText = formState.selectedFocusAreas.isEmpty
+        ? 'General Therapy'
+        : formState.selectedFocusAreas.join(', ');
+
+    final priceCents = therapist?.priceCents ?? 18000;
+    final priceAmount = priceCents > 0 ? priceCents / 100.0 : 180.0;
+    final formattedSessionFee = '\$${priceAmount.toStringAsFixed(2)}';
+    final formattedTotal = '\$${priceAmount.toStringAsFixed(2)} AUD';
+    final payButtonText = 'Pay \$${priceAmount.toStringAsFixed(2)} and book';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -77,6 +286,42 @@ class _BookingStep3ReviewPayScreenState
                   const SizedBox(width: 40),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // Step Progress Indicators (3 Bars)
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.lg),
 
               // Header Title & Hold Timer Badge
@@ -86,37 +331,26 @@ class _BookingStep3ReviewPayScreenState
                   Text(
                     'Review and pay',
                     style: GoogleFonts.outfit(
-                      fontSize: 18,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                     ),
                   ),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.access_time_rounded,
-                          size: 13,
-                          color: Color(0xFFB45309),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hold 08:42',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFFB45309),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      _formattedHoldTime,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFB45309),
+                      ),
                     ),
                   ),
                 ],
@@ -143,15 +377,35 @@ class _BookingStep3ReviewPayScreenState
                             color: Color(0xFFE2EFE0),
                             shape: BoxShape.circle,
                           ),
-                          child: Center(
-                            child: Text(
-                              'PN',
-                              style: GoogleFonts.outfit(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF26682A),
-                              ),
-                            ),
+                          child: ClipOval(
+                            child: therapistPhoto != null &&
+                                    therapistPhoto.isNotEmpty
+                                ? Image.network(
+                                    therapistPhoto,
+                                    fit: BoxFit.cover,
+                                    width: 44,
+                                    height: 44,
+                                    errorBuilder: (_, __, ___) => Center(
+                                      child: Text(
+                                        therapistInitials,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFF26682A),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      therapistInitials,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF26682A),
+                                      ),
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -160,7 +414,7 @@ class _BookingStep3ReviewPayScreenState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Dr Priya Nair',
+                                therapistName,
                                 style: GoogleFonts.outfit(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -168,7 +422,7 @@ class _BookingStep3ReviewPayScreenState
                                 ),
                               ),
                               Text(
-                                'Clinical Psychologist',
+                                therapistRole,
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
                                   color: AppColors.textTertiary,
@@ -196,21 +450,20 @@ class _BookingStep3ReviewPayScreenState
                     const SizedBox(height: 14),
 
                     // Details grid
-                    _buildSummaryRow('Date', 'Wed 4 Nov 2024'),
+                    _buildSummaryRow('Date', formattedDate),
                     const SizedBox(height: 8),
-                    _buildSummaryRow(
-                        'Time', '10:00 - 10:50 am AEDT'),
+                    _buildSummaryRow('Time', formattedTime),
                     const SizedBox(height: 8),
-                    _buildSummaryRow('Format', 'Video in MindEase'),
+                    _buildSummaryRow('Format',
+                        'Video in MindEase (${therapist?.sessionMinutes ?? 50} min)'),
                     const SizedBox(height: 8),
-                    _buildSummaryRow('Focus',
-                        formState.selectedFocusAreas.join(', ')),
+                    _buildSummaryRow('Focus', focusText),
                     const SizedBox(height: 14),
                     const Divider(
                         height: 1, thickness: 1, color: Color(0xFFF4EFEA)),
                     const SizedBox(height: 14),
 
-                    _buildSummaryRow('Session fee', '\$180.00'),
+                    _buildSummaryRow('Session fee', formattedSessionFee),
                     const SizedBox(height: 8),
                     _buildSummaryRow('GST', 'GST-free'),
                     const SizedBox(height: 10),
@@ -226,7 +479,7 @@ class _BookingStep3ReviewPayScreenState
                           ),
                         ),
                         Text(
-                          '\$180.00 AUD',
+                          formattedTotal,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -424,13 +677,13 @@ class _BookingStep3ReviewPayScreenState
                             color: AppColors.textSecondary,
                             height: 1.4,
                           ),
-                          children: [
-                            const TextSpan(
+                          children: const [
+                            TextSpan(
                                 text:
                                     'Free to cancel or reschedule up to 24 hours before. Inside 24 hours the full fee applies. '),
                             TextSpan(
                               text: 'Cancellation policy',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 decoration: TextDecoration.underline,
                               ),
@@ -495,16 +748,16 @@ class _BookingStep3ReviewPayScreenState
                           color: AppColors.textSecondary,
                           height: 1.35,
                         ),
-                        children: [
-                          const TextSpan(text: 'I have read the '),
+                        children: const [
+                          TextSpan(text: 'I have read the '),
                           TextSpan(
                             text: 'Privacy Policy',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
                               decoration: TextDecoration.underline,
                             ),
                           ),
-                          const TextSpan(
+                          TextSpan(
                               text:
                                   ' and agree my booking details are shared with my therapist.'),
                         ],
@@ -517,24 +770,28 @@ class _BookingStep3ReviewPayScreenState
 
               // Pay and Book Button
               AppButton(
-                text: 'Pay \$180.00 and book',
+                text: payButtonText,
                 onPressed: () {
                   // Add new appointment
                   final newAppointment = AppointmentModel(
                     id: 'bk-${DateTime.now().millisecondsSinceEpoch}',
-                    therapistName: 'Dr Priya Nair',
-                    therapistRole: 'Clinical Psychologist',
-                    therapistInitials: 'PN',
-                    dateString: 'Wed 4 Nov',
-                    dateBadge: 'NOV 4',
-                    timeString: formState.selectedTimeSlot,
-                    duration: '50 min video',
+                    therapistName: therapistName,
+                    therapistRole: therapist?.specialties.isNotEmpty == true
+                        ? therapist!.specialties.first
+                        : 'Clinical Psychologist',
+                    therapistInitials: therapistInitials,
+                    dateString: _formatShortDate(formState.selectedDate),
+                    dateBadge: _formatDateBadge(formState.selectedDate),
+                    timeString: _formatTimeStringShort(formState),
+                    duration: '${therapist?.sessionMinutes ?? 50} min video',
                     format: 'Video in MindEase',
                     status: AppointmentStatus.upcoming,
                     isNextSession: true,
                     focusAreas: formState.selectedFocusAreas,
-                    totalAmount: 180.0,
-                    bookingRef: 'ME-BK-020125',
+                    totalAmount: priceAmount,
+                    bookingRef:
+                        'ME-BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+                    therapistNotes: formState.therapistNotes,
                   );
 
                   ref
@@ -594,3 +851,4 @@ class _BookingStep3ReviewPayScreenState
     );
   }
 }
+

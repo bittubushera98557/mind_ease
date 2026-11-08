@@ -366,6 +366,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               videoDescription: extra?['videoDescription'] ??
                   "Why mental health is something everyone has, not just a label for illness.",
               duration: extra?['duration'] ?? "1:12",
+              videoCompletePercent: extra?['videoCompletePercent'] ?? 90,
             ),
             state,
           );
@@ -409,6 +410,15 @@ CustomTransitionPage<void> _buildPage(Widget child, GoRouterState state) {
 /// Helper class to bridge Riverpod Provider updates to GoRouter refreshListenable
 class _RiverpodRefreshListenable extends ChangeNotifier {
   _RiverpodRefreshListenable(Ref ref) {
-    ref.listen<AuthState>(authStateProvider, (_, __) => notifyListeners());
+ /*   ref.listen<AuthState>(authStateProvider, (_, __) => notifyListeners());*/
+    ref.listen<AuthState>(authStateProvider, (previous, next) {
+      if (previous?.status != next.status) {
+        if (next.status == AuthStatus.authenticated ||
+            (previous?.status == AuthStatus.authenticated &&
+                next.status == AuthStatus.unauthenticated)) {
+          notifyListeners();
+        }
+      }
+    });
   }
 }

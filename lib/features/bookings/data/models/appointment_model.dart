@@ -1,3 +1,6 @@
+import 'therapist_based_available_slots_resp.dart';
+import 'therapists_list_resp.dart';
+
 enum AppointmentStatus {
   upcoming,
   completed,
@@ -52,6 +55,8 @@ class BookingFormState {
   final String paymentMethod; // "Apple Pay", "Visa •••• 4242"
   final bool telehealthConsent;
   final bool privacyConsent;
+  final TherapistModel? selectedTherapist;
+  final Slot? selectedSlotObj;
 
   BookingFormState({
     this.selectedFocusAreas = const ['Stress', 'Sleep'],
@@ -63,7 +68,9 @@ class BookingFormState {
     this.paymentMethod = 'Apple Pay',
     this.telehealthConsent = true,
     this.privacyConsent = true,
-  }) : selectedDate = selectedDate ?? DateTime(2024, 11, 4);
+    this.selectedTherapist,
+    this.selectedSlotObj,
+  }) : selectedDate = selectedDate ?? DateTime.now();
 
   BookingFormState copyWith({
     List<String>? selectedFocusAreas,
@@ -75,6 +82,8 @@ class BookingFormState {
     String? paymentMethod,
     bool? telehealthConsent,
     bool? privacyConsent,
+    TherapistModel? selectedTherapist,
+    Slot? selectedSlotObj,
   }) {
     return BookingFormState(
       selectedFocusAreas: selectedFocusAreas ?? this.selectedFocusAreas,
@@ -87,6 +96,8 @@ class BookingFormState {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       telehealthConsent: telehealthConsent ?? this.telehealthConsent,
       privacyConsent: privacyConsent ?? this.privacyConsent,
+      selectedTherapist: selectedTherapist ?? this.selectedTherapist,
+      selectedSlotObj: selectedSlotObj ?? this.selectedSlotObj,
     );
   }
 }

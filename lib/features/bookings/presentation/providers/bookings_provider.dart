@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/appointment_model.dart';
+import '../../data/models/therapist_based_available_slots_resp.dart';
+import '../../data/models/therapists_list_resp.dart';
 
 /// Provider for tab index in My Appointments (0: Upcoming, 1: Past)
 final bookingsTabProvider = StateProvider<int>((ref) => 0);
@@ -12,6 +14,17 @@ final bookingFormNotifierProvider =
 
 class BookingFormNotifier extends StateNotifier<BookingFormState> {
   BookingFormNotifier() : super(BookingFormState());
+
+  void updateTherapist(TherapistModel therapist) {
+    state = state.copyWith(selectedTherapist: therapist);
+  }
+
+  void updateSlotObj(Slot slot) {
+    state = state.copyWith(
+      selectedSlotObj: slot,
+      selectedDate: slot.startsAt,
+    );
+  }
 
   void toggleFocusArea(String focusArea) {
     final current = List<String>.from(state.selectedFocusAreas);
@@ -34,7 +47,11 @@ class BookingFormNotifier extends StateNotifier<BookingFormState> {
   }
 
   void updateDate(DateTime date) {
-    state = state.copyWith(selectedDate: date);
+    state = state.copyWith(
+      selectedDate: date,
+      selectedTimeSlot: '',
+      selectedSlotObj: null,
+    );
   }
 
   void updateTimeSlot(String slot) {

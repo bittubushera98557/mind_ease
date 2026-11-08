@@ -11,6 +11,7 @@ class VideoDetailScreen extends StatefulWidget {
   final String videoTitle;
   final String videoDescription;
   final String duration;
+  final int videoCompletePercent;
 
   const VideoDetailScreen({
     Key? key,
@@ -20,6 +21,7 @@ class VideoDetailScreen extends StatefulWidget {
     this.videoDescription =
         "Why mental health is something everyone has, not just a label for illness.",
     this.duration = "1:12",
+    this.videoCompletePercent = 90,
   }) : super(key: key);
 
   @override
@@ -213,7 +215,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
               const SizedBox(height: 8),
 
               Text(
-                '0% played · needs 90%',
+                '0% played · needs ${widget.videoCompletePercent}%',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
