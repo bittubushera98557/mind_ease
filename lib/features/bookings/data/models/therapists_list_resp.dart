@@ -59,6 +59,38 @@ class TherapistsListResp {
   }
 }
 
+/// Cleans focus area or specialty label if it is a raw map or key-label string
+String cleanFocusLabel(dynamic item) {
+  if (item == null) return '';
+  if (item is Map) {
+    final label = item['label'] ?? item['name'] ?? item['title'] ?? item['key'];
+    if (label != null && label.toString().isNotEmpty) {
+      return label.toString().trim();
+    }
+    return item.toString();
+  }
+  final str = item.toString().trim();
+  if (str.isEmpty) return '';
+
+  // Extract label if pattern match like "label: ..."
+  final labelMatch =
+      RegExp(r'label:\s*([^,\}\]]+)', caseSensitive: false).firstMatch(str);
+  if (labelMatch != null) {
+    final extracted = labelMatch.group(1)?.trim() ?? str;
+    return extracted.replaceAll('"', '').replaceAll("'", '').trim();
+  }
+
+  // Extract key if pattern match like "key: ..."
+  final keyMatch =
+      RegExp(r'key:\s*([^,\}\]]+)', caseSensitive: false).firstMatch(str);
+  if (keyMatch != null) {
+    final extracted = keyMatch.group(1)?.trim() ?? str;
+    return extracted.replaceAll('"', '').replaceAll("'", '').trim();
+  }
+
+  return str;
+}
+
 /// Model representing a single Therapist item from /therapists
 class TherapistModel {
   final String id;
@@ -85,9 +117,10 @@ class TherapistModel {
 
   factory TherapistModel.fromJson(Map<String, dynamic> json) {
     List<String> specs = [];
-    if (json['specialties'] is List) {
-      specs = (json['specialties'] as List)
-          .map((e) => e?.toString() ?? '')
+    final rawSpecs = json['specialties'] ?? json['focus'] ?? json['focusAreas'];
+    if (rawSpecs is List) {
+      specs = rawSpecs
+          .map((e) => cleanFocusLabel(e))
           .where((e) => e.isNotEmpty)
           .toList();
     }

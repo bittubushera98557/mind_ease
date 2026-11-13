@@ -48,16 +48,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final token = await _repository.getAccessToken();
       if (token != null && token.isNotEmpty) {
-        final user = await _repository.getStoredUser();
-        if (user != null) {
-          state = AuthState.authenticated(user);
+        try {
+          final freshUser = await _repository.fetchCurrentUser();
+          state = AuthState.authenticated(freshUser);
           return;
+        } catch (_) {
+          final user = await _repository.getStoredUser();
+          if (user != null) {
+            state = AuthState.authenticated(user);
+            return;
+          }
         }
       }
       state = AuthState.unauthenticated();
     } catch (_) {
       state = AuthState.unauthenticated();
     }
+  }
+
+  /// Explicitly fetches current user profile from GET /me and updates state
+  Future<void> fetchCurrentUser() async {
+    try {
+      final user = await _repository.fetchCurrentUser();
+      state = AuthState.authenticated(user);
+    } catch (_) {}
   }
 
   /// Registers user with dynamic registration API
@@ -166,8 +180,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Updates profile details via PATCH /me as multipart/form-data
-  Future<bool> updateProfile({
+  /// Updates profile details via POST /me as multipart/form-data.
+  /// Returns null on success, or the error message string on failure.
+  Future<String?> updateProfile({
     required String firstName,
     required String lastName,
     String? preferredName,
@@ -190,28 +205,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       final current = state.user;
+      final newFirstName = updatedUser.firstName ?? firstName;
+      final newLastName = updatedUser.lastName ?? lastName;
       final newName = updatedUser.name.isNotEmpty
           ? updatedUser.name
-          : '$firstName $lastName'.trim();
+          : '$newFirstName $newLastName'.trim();
       final newEmail = updatedUser.email.isNotEmpty
           ? updatedUser.email
           : email;
+      final newPhoto = removePhoto == true ? null : (updatedUser.photo ?? current?.photo);
 
       state = AuthState.authenticated(
         UserModel(
-          id: current?.id ?? updatedUser.id,
+          id: (updatedUser.id.isNotEmpty) ? updatedUser.id : (current?.id ?? ''),
           name: newName,
-          firstName: firstName,
-          lastName: lastName,
+          firstName: newFirstName,
+          lastName: newLastName,
           email: newEmail,
-          mobile: mobile,
-          photo: removePhoto == true ? null : (updatedUser.photo ?? current?.photo),
-          createdAt: current?.createdAt ?? updatedUser.createdAt,
+          mobile: updatedUser.mobile ?? mobile,
+          photo: newPhoto,
+          createdAt: (updatedUser.createdAt?.isNotEmpty == true)
+              ? updatedUser.createdAt
+              : current?.createdAt,
         ),
       );
-      return true;
-    } catch (_) {
-      return false;
+      return null; // null indicates success
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (e) {
+      return e is Exception
+          ? e.toString().replaceAll('Exception: ', '')
+          : 'Failed to update profile. Please try again.';
     }
   }
 

@@ -14,11 +14,13 @@ import '../data/models/program_detail_response_model.dart';
 class PhaseWatchScreen extends ConsumerWidget {
   final List<PhaseVideoModel>? videos;
   final int phaseNumber;
+  final String? programId;
 
   const PhaseWatchScreen({
     Key? key,
     this.videos,
     this.phaseNumber = 1,
+    this.programId,
   }) : super(key: key);
 
   static const List<_VideoData> _defaultVideos = [
@@ -52,6 +54,9 @@ class PhaseWatchScreen extends ConsumerWidget {
     final hasDynamicVideos = videos != null && videos!.isNotEmpty;
     final totalVideos =
         hasDynamicVideos ? videos!.length : _defaultVideos.length;
+    final watchedVideosCount = hasDynamicVideos
+        ? videos!.where((v) => v.isVideoWatched).length
+        : 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -102,7 +107,7 @@ class PhaseWatchScreen extends ConsumerWidget {
 
               // Description bound to Config Model's videoCompletePercent
               Text(
-                '0 of $totalVideos videos watched. A video counts once you\'ve played $videoCompletePercent% of it.',
+                '$watchedVideosCount of $totalVideos videos watched. A video counts once you\'ve played $videoCompletePercent% of it.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w400,
@@ -176,7 +181,9 @@ class PhaseWatchScreen extends ConsumerWidget {
             'videoDescription': video.description ?? '',
             'duration': durationStr,
             'mediaUrl': video.mediaUrl,
+            'thumbnailUrl': video.thumbnailUrl,
             'videoCompletePercent': videoCompletePercent,
+            'programId': programId,
           },
         );
       },
@@ -197,7 +204,7 @@ class PhaseWatchScreen extends ConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Red / Terracotta Video Thumbnail box with play icon & duration
+            // Video Thumbnail box with play icon & duration
             Container(
               width: 90,
               height: 62,
@@ -205,38 +212,57 @@ class PhaseWatchScreen extends ConsumerWidget {
                 color: AppColors.primary,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Stack(
-                children: [
-                  const Center(
-                    child: Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 30,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    if (video.thumbnailUrl != null &&
+                        video.thumbnailUrl!.isNotEmpty)
+                      Positioned.fill(
+                        child: Image.network(
+                          video.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withOpacity(0.25),
+                      ),
                     ),
-                  ),
-                  Positioned(
-                    right: 6,
-                    bottom: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
+                    const Center(
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 30,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        durationStr,
-                        style: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                    ),
+                    Positioned(
+                      right: 6,
+                      bottom: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.65),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          durationStr,
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -270,11 +296,13 @@ class PhaseWatchScreen extends ConsumerWidget {
                   ],
                   const SizedBox(height: 6),
                   Text(
-                    'Not started',
+                    video.isVideoWatched ? 'Watched' : 'Not watched',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textTertiary,
+                      color: video.isVideoWatched
+                          ? const Color(0xFF4C7B3B)
+                          : AppColors.textTertiary,
                     ),
                   ),
                 ],

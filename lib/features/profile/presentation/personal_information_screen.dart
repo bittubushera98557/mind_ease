@@ -32,6 +32,7 @@ class _PersonalInformationScreenState
   bool _remindersEnabled = true;
   bool _isSaving = false;
   bool _isDeletingPhoto = false;
+  String? _mobileError;
 
   @override
   void initState() {
@@ -233,6 +234,10 @@ class _PersonalInformationScreenState
     final email = _emailController.text.trim();
     final mobile = _mobileController.text.trim();
 
+    setState(() {
+      _mobileError = null;
+    });
+
     if (firstName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -257,7 +262,7 @@ class _PersonalInformationScreenState
       _isSaving = true;
     });
 
-    final success = await ref.read(authNotifierProvider.notifier).updateProfile(
+    final errorMessage = await ref.read(authNotifierProvider.notifier).updateProfile(
           firstName: firstName,
           lastName: lastName,
           preferredName: preferredName,
@@ -265,7 +270,7 @@ class _PersonalInformationScreenState
           mobile: mobile,
           remindersEnabled: _remindersEnabled,
           removePhoto: false,
-        //  photoFile: _selectedPhotoFile,
+          photoFile: _selectedPhotoFile,
         );
 
     if (mounted) {
@@ -273,7 +278,10 @@ class _PersonalInformationScreenState
         _isSaving = false;
       });
 
-      if (success) {
+      if (errorMessage == null) {
+        setState(() {
+          _selectedPhotoFile = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profile updated successfully'),
@@ -286,9 +294,15 @@ class _PersonalInformationScreenState
           context.go(RouteNames.dashboard, extra: 3);
         }
       } else {
+        if (errorMessage.toLowerCase().contains('mobile') ||
+            errorMessage.contains('0412')) {
+          setState(() {
+            _mobileError = errorMessage;
+          });
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update profile. Please try again.'),
+          SnackBar(
+            content: Text(errorMessage),
             backgroundColor: AppColors.alertErrorText,
           ),
         );
@@ -299,8 +313,9 @@ class _PersonalInformationScreenState
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).user;
-    final initial =
-        (user?.name.isNotEmpty == true) ? user!.name[0].toUpperCase() : 'R';
+    final initial = (user?.firstName?.isNotEmpty == true
+        ? user!.firstName![0]
+        : (user?.name.isNotEmpty == true ? user!.name[0] : 'U')).toUpperCase();
     final hasExistingPhoto = _selectedPhotoFile != null || (user?.photo != null && user!.photo!.isNotEmpty);
 
     return Scaffold(
@@ -634,21 +649,40 @@ class _PersonalInformationScreenState
                     TextField(
                       controller: _mobileController,
                       keyboardType: TextInputType.phone,
+                      onChanged: (_) {
+                        if (_mobileError != null) {
+                          setState(() {
+                            _mobileError = null;
+                          });
+                        }
+                      },
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
-                      decoration: _buildInputDecoration(),
+                      decoration: _buildInputDecoration(errorText: _mobileError),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Used for session reminders and as the backup if a video session drops.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        color: AppColors.textTertiary,
+                    if (_mobileError != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _mobileError!,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.alertErrorText,
+                        ),
                       ),
-                    ),
+                    ] else ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Used for session reminders and as the backup if a video session drops.',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -806,22 +840,29 @@ class _PersonalInformationScreenState
     return 'Member since $day/$month/$year';
   }
 
-  InputDecoration _buildInputDecoration() {
+  InputDecoration _buildInputDecoration({String? errorText}) {
+    final hasError = errorText != null && errorText.isNotEmpty;
     return InputDecoration(
       filled: true,
-      fillColor: const Color(0xFFF7F4F0),
+      fillColor: hasError ? AppColors.alertErrorBg : const Color(0xFFF7F4F0),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: hasError
+            ? const BorderSide(color: AppColors.alertErrorText)
+            : BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: hasError
+            ? const BorderSide(color: AppColors.alertErrorText)
+            : BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary),
+        borderSide: BorderSide(
+          color: hasError ? AppColors.alertErrorText : AppColors.primary,
+        ),
       ),
     );
   }

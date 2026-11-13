@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_button.dart';
+import '../data/models/assessment_response_model.dart';
+import 'providers/questionnaire_provider.dart';
 
 /// 1.10 Questionnaire Results Screen – "You don't have to wait to get support"
-class QuestionnaireResultsScreen extends StatelessWidget {
-  const QuestionnaireResultsScreen({Key? key}) : super(key: key);
+class QuestionnaireResultsScreen extends ConsumerWidget {
+  final AssessmentResponseModel? assessmentModel;
 
-  static const List<_FocusPhase> _phases = [
+  const QuestionnaireResultsScreen({Key? key, this.assessmentModel})
+      : super(key: key);
+
+  static const List<_FocusPhase> _fallbackPhases = [
     _FocusPhase(
       number: 1,
       title: "How's Your Head, Really?",
@@ -36,7 +42,40 @@ class QuestionnaireResultsScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 1. Direct model passed in navigation extra
+    if (assessmentModel != null) {
+      return _buildMainUi(context, assessmentModel);
+    }
+
+    // 2. In-memory state provider from survey submission
+    final lastModel = ref.watch(lastAssessmentResponseProvider);
+    if (lastModel != null) {
+      return _buildMainUi(context, lastModel);
+    }
+
+    // 3. Fallback: fetch GET /me/assessment dynamically
+    final asyncAssessment = ref.watch(assessmentResponseProvider);
+
+    return asyncAssessment.when(
+      data: (model) => _buildMainUi(context, model),
+      loading: () => const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      ),
+      error: (_, __) => _buildMainUi(context, null),
+    );
+  }
+
+  Widget _buildMainUi(BuildContext context, AssessmentResponseModel? model) {
+    final recommendation = model?.recommendation;
+    final phases = _extractPhases(recommendation);
+    final showSupportCard = recommendation == null ||
+        recommendation.showSupport ||
+        recommendation.suggestProfessional;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
@@ -46,26 +85,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
             expandedHeight: 220,
             pinned: true,
             backgroundColor: AppColors.primary,
-            leading: SizedBox(),/*Padding(
-              padding: const EdgeInsets.all(10),
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).maybePop(),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.55),
-                      width: 1,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-              ),
-            ),*/
+            leading: const SizedBox(),
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(
@@ -147,12 +167,13 @@ class QuestionnaireResultsScreen extends StatelessWidget {
                   const SizedBox(height: AppSpacing.lg),
 
                   // ── Support Card ──────────────────────────────────────
-                  _buildSupportCard(context),
-
-                  const SizedBox(height: AppSpacing.lg),
+                  if (showSupportCard) ...[
+                    _buildSupportCard(context),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
 
                   // ── Recommended Program Card ──────────────────────────
-                  _buildRecommendedCard(),
+                  _buildRecommendedCard(recommendation),
 
                   const SizedBox(height: AppSpacing.xxl),
 
@@ -163,10 +184,10 @@ class QuestionnaireResultsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.md),
 
-                  ...List.generate(_phases.length, (i) {
+                  ...List.generate(phases.length, (i) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _buildPhaseCard(_phases[i]),
+                      child: _buildPhaseCard(phases[i]),
                     );
                   }),
 
@@ -178,7 +199,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
                     style: AppTypography.screenTitle.copyWith(fontSize: 18),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _buildPlanSection(),
+                  _buildPlanSection(recommendation),
 
                   const SizedBox(height: AppSpacing.xl),
 
@@ -216,6 +237,39 @@ class QuestionnaireResultsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<_FocusPhase> _extractPhases(RecommendationModel? recommendation) {
+    if (recommendation != null && recommendation.focusPhases.isNotEmpty) {
+      return recommendation.focusPhases.map((p) {
+        final color = _parseColor(p.color, const Color(0xFF9BB068));
+        final subtitles = p.reasons
+            .map((r) => r.startsWith('•') ? r : '• $r')
+            .toList();
+        return _FocusPhase(
+          number: p.number,
+          title: p.title.isNotEmpty ? p.title : "Phase ${p.number}",
+          subtitles: subtitles.isNotEmpty
+              ? subtitles
+              : ["• Suggested phase based on your responses"],
+          color: color,
+        );
+      }).toList();
+    }
+    return _fallbackPhases;
+  }
+
+  Color _parseColor(String? hexString, Color defaultColor) {
+    if (hexString == null || hexString.isEmpty) return defaultColor;
+    try {
+      final cleanHex = hexString.replaceAll('#', '');
+      if (cleanHex.length == 6) {
+        return Color(int.parse('0xFF$cleanHex'));
+      } else if (cleanHex.length == 8) {
+        return Color(int.parse('0x$cleanHex'));
+      }
+    } catch (_) {}
+    return defaultColor;
   }
 
   Widget _buildSupportCard(BuildContext context) {
@@ -295,7 +349,16 @@ class QuestionnaireResultsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecommendedCard() {
+  Widget _buildRecommendedCard(RecommendationModel? recommendation) {
+    String programTitle = 'Mental Health First Aid Self-Reflection Program';
+    if (recommendation?.programId != null && recommendation!.programId!.isNotEmpty) {
+      if (recommendation.programId?.toLowerCase() == 'mhfa') {
+        programTitle = 'Mental Health First Aid Self-Reflection Program';
+      } else {
+        programTitle = '${recommendation.programId!.toUpperCase()} Program';
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -316,7 +379,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
           Container(
             width: 48,
             height: 48,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.primarySubtle,
               shape: BoxShape.circle,
             ),
@@ -342,7 +405,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Mental Health First Aid Self-Reflection Program',
+                  programTitle,
                   style: AppTypography.inputLabel.copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -435,7 +498,16 @@ class QuestionnaireResultsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPlanSection() {
+  Widget _buildPlanSection(RecommendationModel? recommendation) {
+    final dailyText = recommendation?.dailyMinutes != null
+        ? '${recommendation!.dailyMinutes}+ minutes a day'
+        : '20+ minutes a day';
+
+    final formatText = recommendation?.learningStyle != null &&
+            recommendation!.learningStyle!.isNotEmpty
+        ? recommendation.learningStyle!
+        : 'A mix of formats';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -447,7 +519,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
         children: [
           _buildPlanItem(
             icon: Icons.schedule_rounded,
-            text: '20+ minutes a day',
+            text: dailyText,
             subtext: 'Daily time goal',
           ),
           const Padding(
@@ -456,7 +528,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
           ),
           _buildPlanItem(
             icon: Icons.menu_book_rounded,
-            text: 'A mix of formats',
+            text: formatText,
             subtext: "We'll highlight these first in each phase",
           ),
           const Padding(
@@ -466,7 +538,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
           _buildPlanItem(
             icon: Icons.person_outline_rounded,
             text: 'Consider talking to a professional',
-            subtext: "Therapy booking is coming to MindEase. A GP is a good first step.",
+            subtext: "Therapy booking is coming to MindEase.\nA GP is a good first step.",
           ),
         ],
       ),
@@ -487,7 +559,7 @@ class QuestionnaireResultsScreen extends StatelessWidget {
       children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppColors.primarySubtle,
             borderRadius: AppSpacing.roundedSm,
           ),

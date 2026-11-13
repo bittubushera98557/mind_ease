@@ -64,6 +64,66 @@ class ProgramDetailScreen extends ConsumerWidget {
           );
         }
 
+        // Calculate progress metrics across all phases directly from GET /programs/{programId}
+        int totalProgramDone = 0;
+        int totalProgramTotal = 0;
+        int completedPhasesCount = 0;
+        int activePhaseNumber = 1;
+        bool foundActivePhase = false;
+        bool previousPhaseCompleted = true;
+
+        final phases = detail.phases;
+        final phaseProgressList = <_PhaseProgressStats>[];
+
+        for (int i = 0; i < phases.length; i++) {
+          final phase = phases[i];
+          final lessonsDone = phase.lessons.where((l) => l.isRead).length;
+          final lessonsTotal = phase.lessons.length;
+          final videosDone = phase.videos.where((v) => v.isVideoWatched).length;
+          final videosTotal = phase.videos.length;
+          final activityDone = phase.activity?.isCompleted == true ? 1 : 0;
+          final activityTotal = phase.activity != null ? 1 : 0;
+          final quizDone = phase.quiz?.isCompleted == true ? 1 : 0;
+          final quizTotal = phase.quiz != null ? 1 : 0;
+
+          final phaseDone = lessonsDone + videosDone + activityDone + quizDone;
+          final phaseTotal = lessonsTotal + videosTotal + activityTotal + quizTotal;
+
+          final isUnlocked = i == 0 ||
+              phase.unlockRequirements?.previousPhaseCompleted == true ||
+              previousPhaseCompleted;
+
+          final isCompleted = (phaseTotal > 0 && phaseDone >= phaseTotal) ||
+              phase.quiz?.isCompleted == true;
+
+          previousPhaseCompleted = isCompleted;
+
+          if (isCompleted) {
+            completedPhasesCount++;
+          } else if (!foundActivePhase && isUnlocked) {
+            activePhaseNumber = phase.number > 0 ? phase.number : i + 1;
+            foundActivePhase = true;
+          }
+
+          totalProgramDone += phaseDone;
+          totalProgramTotal += phaseTotal;
+
+          phaseProgressList.add(_PhaseProgressStats(
+            phase: phase,
+            phaseNumber: phase.number > 0 ? phase.number : i + 1,
+            isUnlocked: isUnlocked,
+            isCompleted: isCompleted,
+            itemsDone: phaseDone,
+            itemsTotal: phaseTotal,
+          ));
+        }
+
+        final double progressRatio = totalProgramTotal > 0
+            ? (totalProgramDone / totalProgramTotal)
+            : 0.0;
+        final int progressPercentage = (progressRatio * 100).toInt();
+        final userPoints = _calculateDefaultPoints(detail);
+
         return Scaffold(
           backgroundColor: AppColors.background,
           body: RefreshIndicator(
@@ -77,8 +137,15 @@ class ProgramDetailScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Terracotta Header with details
-                  _buildHeader(context, detail),
+                  // Terracotta Header with progress details
+                  _buildHeader(
+                    context,
+                    detail,
+                    userPoints: userPoints,
+                    activePhaseNumber: activePhaseNumber,
+                    progressPercentage: progressPercentage,
+                    progressRatio: progressRatio,
+                  ),
 
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -123,7 +190,7 @@ class ProgramDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             Text(
-                              '0 of ${detail.phases.isNotEmpty ? detail.phases.length : 4} complete',
+                              '$completedPhasesCount of ${phases.isNotEmpty ? phases.length : 4} complete',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w500,
@@ -134,33 +201,36 @@ class ProgramDetailScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 14),
 
-                        // Render phases dynamically if available
-                        if (detail.phases.isNotEmpty)
-                          ...List.generate(detail.phases.length, (index) {
-                            final phase = detail.phases[index];
-                            final isFirstOrUnlocked = index == 0;
+                        // Render phases dynamically
+                        if (phaseProgressList.isNotEmpty)
+                          ...List.generate(phaseProgressList.length, (index) {
+                            final stats = phaseProgressList[index];
 
-                            if (isFirstOrUnlocked) {
+                            if (stats.isUnlocked) {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12.0),
-                                child: _buildActivePhaseCard(context, phase, programId: detail.id),
+                                child: _buildActivePhaseCard(
+                                  context,
+                                  stats.phase,
+                                  programId: detail.id,
+                                  itemsDone: stats.itemsDone,
+                                  itemsTotal: stats.itemsTotal,
+                                  isCompleted: stats.isCompleted,
+                                ),
                               );
                             } else {
-                              final prevNumber =
-                                  detail.phases[index - 1].number > 0
-                                      ? detail.phases[index - 1].number
-                                      : index;
-                              final currentNumber =
-                                  phase.number > 0 ? phase.number : index + 1;
+                              final prevNumber = index > 0
+                                  ? phaseProgressList[index - 1].phaseNumber
+                                  : index;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12.0),
                                 child: _buildLockedPhaseCard(
                                   context,
-                                  phase: phase,
-                                  number: currentNumber,
-                                  title: phase.title,
+                                  phase: stats.phase,
+                                  number: stats.phaseNumber,
+                                  title: stats.phase.title,
                                   unlockMessage:
-                                      'Complete Phase $prevNumber to unlock Phase $currentNumber.',
+                                      'Complete Phase $prevNumber to unlock Phase ${stats.phaseNumber}.',
                                 ),
                               );
                             }
@@ -219,6 +289,16 @@ class ProgramDetailScreen extends ConsumerWidget {
     );
   }
 
+  int _calculateDefaultPoints(ProgramDetailResponseModel detail) {
+    int totalPts = 0;
+    for (var phase in detail.phases) {
+      if (phase.pointsAwarded != null) {
+        totalPts += phase.pointsAwarded!;
+      }
+    }
+    return totalPts;
+  }
+
   Widget _buildErrorState(BuildContext context, WidgetRef ref, String error) {
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -273,18 +353,14 @@ class ProgramDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, ProgramDetailResponseModel detail) {
-    int totalPts = 0;
-    for (var phase in detail.phases) {
-      if (phase.pointsAwarded != null) {
-        totalPts += phase.pointsAwarded!;
-      }
-    }
-
-    final activePhaseNumber = detail.phases.isNotEmpty && detail.phases.first.number > 0
-        ? detail.phases.first.number
-        : 1;
-
+  Widget _buildHeader(
+    BuildContext context,
+    ProgramDetailResponseModel detail, {
+    required int userPoints,
+    required int activePhaseNumber,
+    required int progressPercentage,
+    required double progressRatio,
+  }) {
     final title = detail.title.isNotEmpty
         ? detail.title
         : 'Mental Health First Aid\nSelf-Reflection Program';
@@ -331,7 +407,7 @@ class ProgramDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      '$totalPts pts',
+                      '$userPoints pts',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -379,7 +455,7 @@ class ProgramDetailScreen extends ConsumerWidget {
                 ),
               ),
               Text(
-                '0%',
+                '$progressPercentage%',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -392,7 +468,7 @@ class ProgramDetailScreen extends ConsumerWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: 0.0,
+              value: progressRatio.clamp(0.0, 1.0),
               minHeight: 6,
               backgroundColor: Colors.white.withOpacity(0.25),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -470,13 +546,17 @@ class ProgramDetailScreen extends ConsumerWidget {
     BuildContext context,
     ProgramPhaseModel phase, {
     String? programId,
+    int itemsDone = 0,
+    int itemsTotal = 8,
+    bool isCompleted = false,
   }) {
     final phaseNum = phase.number > 0 ? phase.number : 1;
-    final totalItems = phase.lessons.length +
-        phase.videos.length +
-        (phase.activity != null ? 1 : 0) +
-        (phase.quiz != null ? 1 : 0);
-    final totalDisplay = totalItems > 0 ? totalItems : 8;
+    final totalDisplay = itemsTotal > 0 ? itemsTotal : 8;
+    final progressVal = (totalDisplay > 0 ? (itemsDone / totalDisplay) : 0.0).clamp(0.0, 1.0);
+
+    final statusText = isCompleted
+        ? 'Completed'
+        : (itemsDone > 0 ? 'In progress' : 'Ready to start');
 
     return GestureDetector(
       onTap: () => context.push(
@@ -546,36 +626,41 @@ class ProgramDetailScreen extends ConsumerWidget {
                           vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFDF1EE),
+                          color: isCompleted
+                              ? const Color(0xFFDFEEDF)
+                              : const Color(0xFFFDF1EE),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          'Ready to start',
+                          statusText,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                            color: isCompleted
+                                ? const Color(0xFF4C7B3B)
+                                : AppColors.primary,
                           ),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2.5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFDF1EE),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          "You're here",
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                      if (!isCompleted)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDF1EE),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            "You're here",
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -592,7 +677,7 @@ class ProgramDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '0 of $totalDisplay items done',
+              '$itemsDone of $totalDisplay items done',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
@@ -602,11 +687,11 @@ class ProgramDetailScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: const LinearProgressIndicator(
-                value: 0.0,
+              child: LinearProgressIndicator(
+                value: progressVal,
                 minHeight: 5,
-                backgroundColor: Color(0xFFE8E2DA),
-                valueColor: AlwaysStoppedAnimation<Color>(
+                backgroundColor: const Color(0xFFE8E2DA),
+                valueColor: const AlwaysStoppedAnimation<Color>(
                   AppColors.primary,
                 ),
               ),
@@ -761,4 +846,22 @@ class ProgramDetailScreen extends ConsumerWidget {
       unlockMessage: unlockMessage,
     );
   }
+}
+
+class _PhaseProgressStats {
+  final ProgramPhaseModel phase;
+  final int phaseNumber;
+  final bool isUnlocked;
+  final bool isCompleted;
+  final int itemsDone;
+  final int itemsTotal;
+
+  const _PhaseProgressStats({
+    required this.phase,
+    required this.phaseNumber,
+    required this.isUnlocked,
+    required this.isCompleted,
+    required this.itemsDone,
+    required this.itemsTotal,
+  });
 }

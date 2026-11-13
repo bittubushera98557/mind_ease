@@ -29,10 +29,12 @@ class ApiEndpoints {
   static const String questionnairesOnboarding = '/questionnaires/onboarding';
   static const String programs = '/programs';
   static const String programDetailWithId = '/programs/{programId}';
+  static const String readLesson = '/me/programs/{programId}/lessons/{lessonId}/read';
 
  //need to implement below
 
   static const String therapistsList = '/therapists';
+  static const String focusAreas = '/focus-areas';
   static const String therapistsDetailById = '/therapists/{therapistId}';
   static const String therapistBasedSlotsApi = '/therapists/{therapistId}/slots';
 

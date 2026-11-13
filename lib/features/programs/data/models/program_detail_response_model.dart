@@ -6,8 +6,10 @@ class ProgramDetailResponseModel {
   final String? intro;
   final List<String> learn;
   final String? disclaimer;
+  final String? status;
   final String? contentVersion;
   final int displayOrder;
+  final String? coverImage;
   final List<ProgramPhaseModel> phases;
   final ApiErrorModel? error;
 
@@ -18,8 +20,10 @@ class ProgramDetailResponseModel {
     this.intro,
     this.learn = const [],
     this.disclaimer,
+    this.status,
     this.contentVersion,
     this.displayOrder = 0,
+    this.coverImage,
     this.phases = const [],
     this.error,
   });
@@ -56,8 +60,10 @@ class ProgramDetailResponseModel {
       intro: json['intro']?.toString(),
       learn: learnList,
       disclaimer: json['disclaimer']?.toString(),
+      status: json['status']?.toString(),
       contentVersion: json['contentVersion']?.toString(),
       displayOrder: _parseInt(json['displayOrder']),
+      coverImage: json['coverImage']?.toString(),
       phases: phasesList,
     );
   }
@@ -81,9 +87,32 @@ class ProgramDetailResponseModel {
       if (intro != null) 'intro': intro,
       'learn': learn,
       if (disclaimer != null) 'disclaimer': disclaimer,
+      if (status != null) 'status': status,
       if (contentVersion != null) 'contentVersion': contentVersion,
       'displayOrder': displayOrder,
+      if (coverImage != null) 'coverImage': coverImage,
       'phases': phases.map((p) => p.toJson()).toList(),
+    };
+  }
+}
+
+/// Model representing unlock requirements for a phase
+class UnlockRequirementsModel {
+  final bool previousPhaseCompleted;
+
+  const UnlockRequirementsModel({
+    this.previousPhaseCompleted = false,
+  });
+
+  factory UnlockRequirementsModel.fromJson(Map<String, dynamic> json) {
+    return UnlockRequirementsModel(
+      previousPhaseCompleted: json['previousPhaseCompleted'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'previousPhaseCompleted': previousPhaseCompleted,
     };
   }
 }
@@ -101,6 +130,7 @@ class ProgramPhaseModel {
   final List<PhaseVideoModel> videos;
   final PhaseActivityModel? activity;
   final PhaseQuizModel? quiz;
+  final UnlockRequirementsModel? unlockRequirements;
 
   const ProgramPhaseModel({
     this.id = '',
@@ -114,6 +144,7 @@ class ProgramPhaseModel {
     this.videos = const [],
     this.activity,
     this.quiz,
+    this.unlockRequirements,
   });
 
   factory ProgramPhaseModel.fromJson(Map<String, dynamic> json) {
@@ -159,6 +190,10 @@ class ProgramPhaseModel {
       quiz: json['quiz'] is Map<String, dynamic>
           ? PhaseQuizModel.fromJson(json['quiz'] as Map<String, dynamic>)
           : null,
+      unlockRequirements: json['unlockRequirements'] is Map<String, dynamic>
+          ? UnlockRequirementsModel.fromJson(
+              json['unlockRequirements'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -176,11 +211,13 @@ class ProgramPhaseModel {
       'description': description,
       'objectives': objectives,
       'color': color,
-      'pointsAwarded': pointsAwarded,
+      if (pointsAwarded != null) 'pointsAwarded': pointsAwarded,
       'lessons': lessons.map((l) => l.toJson()).toList(),
       'videos': videos.map((v) => v.toJson()).toList(),
       if (activity != null) 'activity': activity!.toJson(),
       if (quiz != null) 'quiz': quiz!.toJson(),
+      if (unlockRequirements != null)
+        'unlockRequirements': unlockRequirements!.toJson(),
     };
   }
 }
@@ -191,18 +228,22 @@ class PhaseLessonModel {
   final String title;
   final int minutes;
   final String? intro;
+  final bool isRead;
   final List<PhaseLessonSectionModel> sections;
   final String? example;
   final String? takeaway;
+  final int displayOrder;
 
   const PhaseLessonModel({
     this.id = '',
     this.title = '',
     this.minutes = 0,
     this.intro,
+    this.isRead = false,
     this.sections = const [],
     this.example,
     this.takeaway,
+    this.displayOrder = 0,
   });
 
   factory PhaseLessonModel.fromJson(Map<String, dynamic> json) {
@@ -220,9 +261,11 @@ class PhaseLessonModel {
       title: json['title']?.toString() ?? '',
       minutes: _parseInt(json['minutes']),
       intro: json['intro']?.toString(),
+      isRead: json['is_read'] == true || json['isRead'] == true,
       sections: sectionsList,
       example: json['example']?.toString(),
       takeaway: json['takeaway']?.toString(),
+      displayOrder: _parseInt(json['displayOrder']),
     );
   }
 
@@ -238,9 +281,11 @@ class PhaseLessonModel {
       'title': title,
       'minutes': minutes,
       if (intro != null) 'intro': intro,
+      'is_read': isRead,
       'sections': sections.map((s) => s.toJson()).toList(),
       if (example != null) 'example': example,
       if (takeaway != null) 'takeaway': takeaway,
+      'displayOrder': displayOrder,
     };
   }
 }
@@ -262,6 +307,8 @@ class PhaseLessonSectionModel {
     List<String> pList = [];
     if (rawP is List) {
       pList = rawP.map((e) => e.toString()).toList();
+    } else if (rawP is String) {
+      pList = [rawP];
     }
 
     final rawList = json['list'];
@@ -286,6 +333,31 @@ class PhaseLessonSectionModel {
   }
 }
 
+/// Model representing completion rule for a video
+class CompletionRuleModel {
+  final String type;
+  final bool useConfig;
+
+  const CompletionRuleModel({
+    this.type = '',
+    this.useConfig = true,
+  });
+
+  factory CompletionRuleModel.fromJson(Map<String, dynamic> json) {
+    return CompletionRuleModel(
+      type: json['type']?.toString() ?? '',
+      useConfig: json['useConfig'] != false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'useConfig': useConfig,
+    };
+  }
+}
+
 /// Model representing a video inside a phase
 class PhaseVideoModel {
   final String id;
@@ -294,6 +366,8 @@ class PhaseVideoModel {
   final int duration;
   final String? mediaUrl;
   final String? thumbnailUrl;
+  final CompletionRuleModel? completionRule;
+  final bool isVideoWatched;
 
   const PhaseVideoModel({
     this.id = '',
@@ -302,6 +376,8 @@ class PhaseVideoModel {
     this.duration = 0,
     this.mediaUrl,
     this.thumbnailUrl,
+    this.completionRule,
+    this.isVideoWatched = false,
   });
 
   factory PhaseVideoModel.fromJson(Map<String, dynamic> json) {
@@ -312,6 +388,11 @@ class PhaseVideoModel {
       duration: _parseInt(json['duration']),
       mediaUrl: json['mediaUrl']?.toString(),
       thumbnailUrl: json['thumbnailUrl']?.toString(),
+      completionRule: json['completionRule'] is Map<String, dynamic>
+          ? CompletionRuleModel.fromJson(
+              json['completionRule'] as Map<String, dynamic>)
+          : null,
+      isVideoWatched: json['is_video_watched'] == true || json['isVideoWatched'] == true,
     );
   }
 
@@ -329,6 +410,8 @@ class PhaseVideoModel {
       'duration': duration,
       'mediaUrl': mediaUrl,
       'thumbnailUrl': thumbnailUrl,
+      if (completionRule != null) 'completionRule': completionRule!.toJson(),
+      'is_video_watched': isVideoWatched,
     };
   }
 }
@@ -339,6 +422,8 @@ class PhaseActivityModel {
   final String title;
   final String? purpose;
   final String? instructions;
+  final bool isDraft;
+  final bool isCompleted;
   final List<PhaseActivityPromptModel> prompts;
 
   const PhaseActivityModel({
@@ -346,6 +431,8 @@ class PhaseActivityModel {
     this.title = '',
     this.purpose,
     this.instructions,
+    this.isDraft = false,
+    this.isCompleted = false,
     this.prompts = const [],
   });
 
@@ -364,6 +451,8 @@ class PhaseActivityModel {
       title: json['title']?.toString() ?? '',
       purpose: json['purpose']?.toString(),
       instructions: json['instructions']?.toString(),
+      isDraft: json['is_draft'] == true || json['isDraft'] == true,
+      isCompleted: json['is_completed'] == true || json['isCompleted'] == true,
       prompts: promptsList,
     );
   }
@@ -374,6 +463,8 @@ class PhaseActivityModel {
       'title': title,
       if (purpose != null) 'purpose': purpose,
       if (instructions != null) 'instructions': instructions,
+      'is_draft': isDraft,
+      'is_completed': isCompleted,
       'prompts': prompts.map((p) => p.toJson()).toList(),
     };
   }
@@ -385,12 +476,16 @@ class PhaseActivityPromptModel {
   final String q;
   final List<String> chips;
   final bool optional;
+  final String? responseType;
+  final String? answer;
 
   const PhaseActivityPromptModel({
     this.id = '',
     this.q = '',
     this.chips = const [],
     this.optional = true,
+    this.responseType,
+    this.answer,
   });
 
   factory PhaseActivityPromptModel.fromJson(Map<String, dynamic> json) {
@@ -405,6 +500,8 @@ class PhaseActivityPromptModel {
       q: json['q']?.toString() ?? '',
       chips: chipsList,
       optional: json['optional'] != false,
+      responseType: json['responseType']?.toString(),
+      answer: json['answer']?.toString(),
     );
   }
 
@@ -414,6 +511,8 @@ class PhaseActivityPromptModel {
       'q': q,
       'chips': chips,
       'optional': optional,
+      if (responseType != null) 'responseType': responseType,
+      if (answer != null) 'answer': answer,
     };
   }
 }
@@ -421,11 +520,17 @@ class PhaseActivityPromptModel {
 /// Model representing a quiz inside a phase
 class PhaseQuizModel {
   final String id;
+  final String? title;
+  final bool isCompleted;
+  final bool isPassed;
   final int? passThreshold;
   final List<PhaseQuizQuestionModel> questions;
 
   const PhaseQuizModel({
     this.id = '',
+    this.title,
+    this.isCompleted = false,
+    this.isPassed = false,
     this.passThreshold,
     this.questions = const [],
   });
@@ -442,6 +547,9 @@ class PhaseQuizModel {
 
     return PhaseQuizModel(
       id: json['id']?.toString() ?? '',
+      title: json['title']?.toString(),
+      isCompleted: json['is_completed'] == true || json['isCompleted'] == true,
+      isPassed: json['is_passed'] == true || json['isPassed'] == true,
       passThreshold: json['passThreshold'] != null
           ? _parseInt(json['passThreshold'])
           : null,
@@ -458,6 +566,9 @@ class PhaseQuizModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      if (title != null) 'title': title,
+      'is_completed': isCompleted,
+      'is_passed': isPassed,
       if (passThreshold != null) 'passThreshold': passThreshold,
       'questions': questions.map((q) => q.toJson()).toList(),
     };
@@ -472,6 +583,7 @@ class PhaseQuizQuestionModel {
   final List<String> options;
   final int answer;
   final String? explain;
+  final int? userAnswer;
 
   const PhaseQuizQuestionModel({
     this.id = '',
@@ -480,6 +592,7 @@ class PhaseQuizQuestionModel {
     this.options = const [],
     this.answer = 0,
     this.explain,
+    this.userAnswer,
   });
 
   factory PhaseQuizQuestionModel.fromJson(Map<String, dynamic> json) {
@@ -496,6 +609,9 @@ class PhaseQuizQuestionModel {
       options: optionsList,
       answer: _parseInt(json['answer']),
       explain: json['explain']?.toString(),
+      userAnswer: json['user_answer'] != null || json['userAnswer'] != null
+          ? _parseInt(json['user_answer'] ?? json['userAnswer'])
+          : null,
     );
   }
 
@@ -513,6 +629,7 @@ class PhaseQuizQuestionModel {
       'options': options,
       'answer': answer,
       if (explain != null) 'explain': explain,
+      if (userAnswer != null) 'user_answer': userAnswer,
     };
   }
 }

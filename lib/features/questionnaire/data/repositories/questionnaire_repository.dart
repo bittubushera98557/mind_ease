@@ -54,4 +54,19 @@ class QuestionnaireRepository {
 
     throw Exception(response.message ?? 'Failed to submit assessment step');
   }
+
+  /// Fetches user assessment GET /me/assessment
+  Future<AssessmentResponseModel> getAssessment() async {
+    final response = await _dioClient.get<AssessmentResponseModel>(
+      ApiEndpoints.meAssessment,
+      fromJson: (json) =>
+          AssessmentResponseModel.fromJson(json as Map<String, dynamic>),
+    );
+
+    if (response.data != null) {
+      return response.data!;
+    }
+
+    throw Exception(response.message ?? 'Failed to fetch assessment');
+  }
 }

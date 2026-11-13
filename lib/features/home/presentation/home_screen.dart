@@ -9,6 +9,7 @@ import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import '../../dashboard/presentation/providers/points_provider.dart';
+import 'dart:developer' as developer;
 
 /// 2.01 Home Screen
 class HomeScreen extends ConsumerWidget {
@@ -23,10 +24,7 @@ class HomeScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: () async {
-          final prefs = await SharedPreferences.getInstance();
-        String?   authToken = prefs.getString(AppConstants.keyAuthToken);
-          debugPrint("Home authToke=$authToken");
-
+          await ref.read(authNotifierProvider.notifier).fetchCurrentUser();
           ref.invalidate(userPointsProvider);
         },
         color: AppColors.primary,
@@ -82,10 +80,11 @@ class HomeScreen extends ConsumerWidget {
   ) {
     final displayName = user?.firstName?.isNotEmpty == true
         ? user!.firstName!
-        : (user?.name.isNotEmpty == true ? user!.name.split(' ').first : 'Ramsy');
+        : (user?.name.isNotEmpty == true ? user!.name.split(' ').first : 'User');
 
-    final initial =
-        (user?.name.isNotEmpty == true) ? user!.name[0].toUpperCase() : 'R';
+    final initial = (user?.firstName?.isNotEmpty == true
+        ? user!.firstName![0]
+        : (user?.name.isNotEmpty == true ? user!.name[0] : 'U')).toUpperCase();
 
     return Container(
       width: double.infinity,
@@ -140,10 +139,22 @@ class HomeScreen extends ConsumerWidget {
                   color: Colors.white.withOpacity(0.18),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.notifications,
-                  size: 20,
-                  color: Colors.white,
+                child: GestureDetector(
+                  onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    String    authToken = prefs.getString(AppConstants.keyAuthToken).toString();
+                    String    refreshToken = prefs.getString(AppConstants.keyRefreshToken).toString();
+                    developer.log('homeAuthToken $authToken', name: 'MindEase.ApiClient');
+                    developer.log('home refreshToken $refreshToken', name: 'MindEase.ApiClient');
+
+                    debugPrint("homeAuthToken=");
+
+                  },
+                  child: const Icon(
+                    Icons.notifications,
+                    size: 20,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -415,7 +426,9 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             GestureDetector(
-              onTap: () {
+              onTap: () async {
+
+
                 context.push(RouteNames.questionnaireResults);
               },
               child: Text(

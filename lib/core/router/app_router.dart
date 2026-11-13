@@ -8,6 +8,7 @@ import '../../features/auth/presentation/providers/auth_state.dart';
 import '../../features/auth/presentation/sign_in_screen.dart';
 import '../../features/auth/presentation/sign_up_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/questionnaire/data/models/assessment_response_model.dart';
 import '../../features/questionnaire/presentation/questionnaire_intro_screen.dart';
 import '../../features/questionnaire/presentation/questionnaire_next_steps_screen.dart';
 import '../../features/questionnaire/presentation/questionnaire_results_screen.dart';
@@ -127,7 +128,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.questionnaireResults,
-        pageBuilder: (context, state) => _buildPage(const QuestionnaireResultsScreen(), state),
+        pageBuilder: (context, state) {
+          final model = state.extra as AssessmentResponseModel?;
+          return _buildPage(
+            QuestionnaireResultsScreen(assessmentModel: model),
+            state,
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.questionnaireNextSteps,
@@ -255,6 +262,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           List<PhaseLessonModel>? lessons;
           int phaseNumber = 1;
+          String? programId;
           if (state.extra is List<PhaseLessonModel>) {
             lessons = state.extra as List<PhaseLessonModel>;
           } else if (state.extra is ProgramPhaseModel) {
@@ -269,11 +277,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             if (map['phaseNumber'] is int) {
               phaseNumber = map['phaseNumber'] as int;
             }
+            if (map['programId'] is String) {
+              programId = map['programId'] as String;
+            }
           }
           return _buildPage(
             PhaseLearnScreen(
               lessons: lessons,
               phaseNumber: phaseNumber,
+              programId: programId,
             ),
             state,
           );
@@ -281,7 +293,37 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.phaseWatch,
-        pageBuilder: (context, state) => _buildPage(const PhaseWatchScreen(), state),
+        pageBuilder: (context, state) {
+          List<PhaseVideoModel>? videos;
+          int phaseNumber = 1;
+          String? programId;
+          if (state.extra is List<PhaseVideoModel>) {
+            videos = state.extra as List<PhaseVideoModel>;
+          } else if (state.extra is ProgramPhaseModel) {
+            final phase = state.extra as ProgramPhaseModel;
+            videos = phase.videos;
+            if (phase.number > 0) phaseNumber = phase.number;
+          } else if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            if (map['videos'] is List<PhaseVideoModel>) {
+              videos = map['videos'] as List<PhaseVideoModel>;
+            }
+            if (map['phaseNumber'] is int) {
+              phaseNumber = map['phaseNumber'] as int;
+            }
+            if (map['programId'] is String) {
+              programId = map['programId'] as String;
+            }
+          }
+          return _buildPage(
+            PhaseWatchScreen(
+              videos: videos,
+              phaseNumber: phaseNumber,
+              programId: programId,
+            ),
+            state,
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.phaseActivity,
@@ -330,6 +372,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           PhaseLessonModel? lesson;
           int lessonNumber = 1;
           int totalLessons = 3;
+          String? programId;
           if (state.extra is PhaseLessonModel) {
             lesson = state.extra as PhaseLessonModel;
           } else if (state.extra is Map<String, dynamic>) {
@@ -343,12 +386,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             if (map['totalLessons'] is int) {
               totalLessons = map['totalLessons'] as int;
             }
+            if (map['programId'] is String) {
+              programId = map['programId'] as String;
+            }
           }
           return _buildPage(
             LessonDetailScreen(
               lesson: lesson,
               lessonNumber: lessonNumber,
               totalLessons: totalLessons,
+              programId: programId,
             ),
             state,
           );
@@ -358,14 +405,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: RouteNames.videoDetail,
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
+          PhaseVideoModel? video;
+          if (extra?['video'] is PhaseVideoModel) {
+            video = extra!['video'] as PhaseVideoModel;
+          }
           return _buildPage(
             VideoDetailScreen(
+              video: video,
               videoNumber: extra?['videoNumber'] ?? 1,
               totalVideos: extra?['totalVideos'] ?? 3,
-              videoTitle: extra?['videoTitle'] ?? "Let's Redefine Mental Health",
+              videoTitle: extra?['videoTitle'] ??
+                  (video?.title ?? "Let's Redefine Mental Health"),
               videoDescription: extra?['videoDescription'] ??
-                  "Why mental health is something everyone has, not just a label for illness.",
-              duration: extra?['duration'] ?? "1:12",
+                  (video?.description ??
+                      "Why mental health is something everyone has, not just a label for illness."),
+              duration: extra?['duration'] ??
+                  (video?.duration != null && video!.duration > 0
+                      ? '${video.duration ~/ 60}:${(video.duration % 60).toString().padLeft(2, '0')}'
+                      : "1:12"),
+              mediaUrl: extra?['mediaUrl'] ?? video?.mediaUrl,
+              thumbnailUrl: extra?['thumbnailUrl'] ?? video?.thumbnailUrl,
               videoCompletePercent: extra?['videoCompletePercent'] ?? 90,
             ),
             state,

@@ -1,6 +1,7 @@
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/dio_client.dart';
 import '../models/program_detail_response_model.dart';
+import '../models/program_progress_response_model.dart';
 import '../models/program_response_model.dart';
 
 /// Repository for handling Programs API operations
@@ -37,5 +38,25 @@ class ProgramsRepository {
     }
 
     throw Exception(response.message ?? 'Failed to load program details');
+  }
+
+  /// Marks a lesson as read POST /me/programs/{programId}/lessons/{lessonId}/read
+  Future<ProgramProgressResponseModel> markLessonAsRead({
+    required String programId,
+    required String lessonId,
+  }) async {
+    final endpoint = ApiEndpoints.readLesson
+        .replaceAll('{programId}', programId)
+        .replaceAll('{lessonId}', lessonId);
+    final response = await _dioClient.post<ProgramProgressResponseModel>(
+      endpoint,
+      fromJson: (json) => ProgramProgressResponseModel.fromJson(json),
+    );
+
+    if (response.data != null) {
+      return response.data!;
+    }
+
+    throw Exception(response.message ?? 'Failed to mark lesson as read');
   }
 }

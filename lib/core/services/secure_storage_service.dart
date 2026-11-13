@@ -66,7 +66,11 @@ class SecureStorageService {
     if (firstName != null) await _storage.write(key: 'user_first_name', value: firstName);
     if (lastName != null) await _storage.write(key: 'user_last_name', value: lastName);
     if (mobile != null) await _storage.write(key: 'user_mobile', value: mobile);
-    if (photo != null) await _storage.write(key: 'user_photo', value: photo);
+    if (photo != null && photo.isNotEmpty) {
+      await _storage.write(key: 'user_photo', value: photo);
+    } else {
+      await _storage.delete(key: 'user_photo');
+    }
     if (createdAt != null && createdAt.isNotEmpty) {
       await _storage.write(key: 'user_created_at', value: createdAt);
     }
@@ -79,7 +83,11 @@ class SecureStorageService {
       if (firstName != null) await prefs.setString('user_first_name', firstName);
       if (lastName != null) await prefs.setString('user_last_name', lastName);
       if (mobile != null) await prefs.setString('user_mobile', mobile);
-      if (photo != null) await prefs.setString('user_photo', photo);
+      if (photo != null && photo.isNotEmpty) {
+        await prefs.setString('user_photo', photo);
+      } else {
+        await prefs.remove('user_photo');
+      }
       if (createdAt != null && createdAt.isNotEmpty) {
         await prefs.setString('user_created_at', createdAt);
       }

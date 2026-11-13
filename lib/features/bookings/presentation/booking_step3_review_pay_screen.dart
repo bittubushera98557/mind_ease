@@ -28,7 +28,7 @@ class _BookingStep3ReviewPayScreenState
     extends ConsumerState<BookingStep3ReviewPayScreen> {
   late final TextEditingController _mobileController;
   Timer? _holdTimer;
-  int _secondsRemaining = 60; // 10 minutes (600 seconds) countdown
+  int _secondsRemaining = 180; // 10 minutes (600 seconds) countdown
 
   @override
   void initState() {
@@ -234,7 +234,7 @@ class _BookingStep3ReviewPayScreenState
 
     final therapistName = therapist?.name ?? 'Dr Priya Nair';
     final therapistRole = therapist?.specialties.isNotEmpty == true
-        ? therapist!.specialties.join(', ')
+        ? therapist!.specialties.map(cleanFocusLabel).where((s) => s.isNotEmpty).join(', ')
         : 'Clinical Psychologist';
     final therapistInitials = therapist?.initials ?? 'PN';
     final therapistPhoto = therapist?.photoUrl;
@@ -243,7 +243,7 @@ class _BookingStep3ReviewPayScreenState
     final formattedTime = _formatTimeString(formState, therapist);
     final focusText = formState.selectedFocusAreas.isEmpty
         ? 'General Therapy'
-        : formState.selectedFocusAreas.join(', ');
+        : formState.selectedFocusAreas.map(cleanFocusLabel).where((s) => s.isNotEmpty).join(', ');
 
     final priceCents = therapist?.priceCents ?? 18000;
     final priceAmount = priceCents > 0 ? priceCents / 100.0 : 180.0;
@@ -433,12 +433,19 @@ class _BookingStep3ReviewPayScreenState
                         ),
                         TextButton(
                           onPressed: () => context.pop(),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                           child: Text(
                             'Change',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
+                              color: const Color(0xFF236539),
+                              decoration: TextDecoration.underline,
+                              decorationColor: const Color(0xFF236539),
                             ),
                           ),
                         ),
@@ -777,7 +784,7 @@ class _BookingStep3ReviewPayScreenState
                     id: 'bk-${DateTime.now().millisecondsSinceEpoch}',
                     therapistName: therapistName,
                     therapistRole: therapist?.specialties.isNotEmpty == true
-                        ? therapist!.specialties.first
+                        ? therapist!.specialties.map(cleanFocusLabel).where((s) => s.isNotEmpty).join(', ')
                         : 'Clinical Psychologist',
                     therapistInitials: therapistInitials,
                     dateString: _formatShortDate(formState.selectedDate),

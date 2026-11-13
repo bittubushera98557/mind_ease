@@ -40,12 +40,34 @@ class PhaseDetailScreen extends StatelessWidget {
     final activity = phase?.activity;
     final quiz = phase?.quiz;
 
+    // Dynamic item counts
     final lessonsCount = lessons.isNotEmpty ? lessons.length : 3;
-    final videosCount = videos.isNotEmpty ? videos.length : 3;
-    final activityCount = activity != null ? 1 : 1;
-    final quizCount = quiz?.questions.isNotEmpty == true ? quiz!.questions.length : 5;
+    final lessonsDoneCount = lessons.where((l) => l.isRead).length;
 
-    final totalItems = lessonsCount + videosCount + (activity != null ? 1 : 1) + (quiz != null ? 1 : 1);
+    final videosCount = videos.isNotEmpty ? videos.length : 3;
+    final videosDoneCount = videos.where((v) => v.isVideoWatched).length;
+
+    final activityCount = activity != null ? 1 : 1;
+    final isActivityCompleted = activity?.isCompleted == true;
+    final activityDoneCount = isActivityCompleted ? 1 : 0;
+
+    final quizCount = quiz?.questions.isNotEmpty == true ? quiz!.questions.length : 5;
+    final isQuizPassed = quiz?.isPassed == true;
+    final isQuizCompleted = quiz?.isCompleted == true;
+    final quizDoneCount = (isQuizPassed || isQuizCompleted) ? 1 : 0;
+
+    final totalDoneItems = lessonsDoneCount + videosDoneCount + activityDoneCount + quizDoneCount;
+    final calculatedTotalItems = lessons.length + videos.length + (activity != null ? 1 : 1) + (quiz != null ? 1 : 1);
+    final totalItems = calculatedTotalItems > 0 ? calculatedTotalItems : 8;
+
+    final double progressRatio = totalItems > 0 ? (totalDoneItems / totalItems) : 0.0;
+    final int progressPercentage = (progressRatio * 100).toInt();
+
+    final bool isPhaseCompleted = (totalDoneItems >= totalItems && totalItems > 0) || isQuizPassed;
+    final String statusText = isPhaseCompleted
+        ? 'Completed'
+        : (totalDoneItems > 0 ? 'In progress' : 'Ready to start');
+
     final objectives = phase?.objectives.isNotEmpty == true
         ? phase!.objectives
         : const [
@@ -56,6 +78,14 @@ class PhaseDetailScreen extends StatelessWidget {
 
     final points = phase?.pointsAwarded ?? 100;
 
+    final activityProgressStr = isActivityCompleted
+        ? 'Completed'
+        : (activity?.isDraft == true ? 'Draft saved' : 'Not started');
+
+    final quizProgressStr = isQuizPassed
+        ? 'Passed'
+        : (isQuizCompleted ? 'Completed' : 'Pass mark ${quiz?.passThreshold ?? 80}%');
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SingleChildScrollView(
@@ -63,12 +93,16 @@ class PhaseDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Terracotta Header
+            // Terracotta Header with dynamic progress
             _buildHeader(
               context,
               number: effectiveNumber,
               title: effectiveTitle,
+              doneItems: totalDoneItems,
               totalItems: totalItems,
+              progressRatio: progressRatio,
+              progressPercentage: progressPercentage,
+              statusText: statusText,
             ),
 
             Padding(
@@ -92,7 +126,7 @@ class PhaseDetailScreen extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // Up Next Card
-                  _buildUpNextCard(context, lessons),
+                  _buildUpNextCard(context, lessons, programId: programId),
                   const SizedBox(height: 16),
 
                   // 2x2 Grid of Content Items (Learn, Watch, Activity, Quiz)
@@ -105,13 +139,14 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconBgColor: const Color(0xFFDFEEDF),
                           title: 'Learn',
                           subtitle: '$lessonsCount lessons',
-                          progress: '0 of $lessonsCount read',
+                          progress: '$lessonsDoneCount of $lessonsCount read',
                           isHighlighted: true,
                           onTap: () => context.push(
                             RouteNames.phaseLearn,
                             extra: {
                               'lessons': lessons,
                               'phaseNumber': effectiveNumber,
+                              'programId': programId,
                             },
                           ),
                         ),
@@ -124,7 +159,7 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconBgColor: const Color(0xFFFDF1EE),
                           title: 'Watch',
                           subtitle: '$videosCount videos',
-                          progress: '0 of $videosCount watched',
+                          progress: '$videosDoneCount of $videosCount watched',
                           isHighlighted: false,
                           onTap: () => context.push(
                             RouteNames.phaseWatch,
@@ -147,7 +182,7 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconBgColor: const Color(0xFFEDE9FB),
                           title: 'Activity',
                           subtitle: '$activityCount activity',
-                          progress: 'Not started',
+                          progress: activityProgressStr,
                           isHighlighted: false,
                           onTap: () => context.push(
                             RouteNames.phaseActivity,
@@ -166,7 +201,7 @@ class PhaseDetailScreen extends StatelessWidget {
                           iconBgColor: const Color(0xFFFFF8DC),
                           title: 'Quiz',
                           subtitle: '$quizCount questions',
-                          progress: 'Pass mark ${quiz?.passThreshold ?? 80}%',
+                          progress: quizProgressStr,
                           isHighlighted: false,
                           onTap: () => context.push(
                             RouteNames.phaseQuiz,
@@ -204,7 +239,11 @@ class PhaseDetailScreen extends StatelessWidget {
     BuildContext context, {
     required int number,
     required String title,
+    required int doneItems,
     required int totalItems,
+    required double progressRatio,
+    required int progressPercentage,
+    required String statusText,
   }) {
     return Container(
       width: double.infinity,
@@ -221,7 +260,7 @@ class PhaseDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top bar: Back button & Ready to start badge
+          // Top bar: Back button & Status badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -239,7 +278,7 @@ class PhaseDetailScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Ready to start',
+                  statusText,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
@@ -277,7 +316,7 @@ class PhaseDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '0 of $totalItems items done',
+                '$doneItems of $totalItems items done',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -285,7 +324,7 @@ class PhaseDetailScreen extends StatelessWidget {
                 ),
               ),
               Text(
-                '0%',
+                '$progressPercentage%',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -298,7 +337,7 @@ class PhaseDetailScreen extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: 0.0,
+              value: progressRatio.clamp(0.0, 1.0),
               minHeight: 6,
               backgroundColor: Colors.white.withOpacity(0.25),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -309,16 +348,42 @@ class PhaseDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUpNextCard(BuildContext context, List<PhaseLessonModel> lessons) {
-    final nextLessonTitle = lessons.isNotEmpty
-        ? 'Lesson: ${lessons.first.title}'
+  Widget _buildUpNextCard(
+    BuildContext context,
+    List<PhaseLessonModel> lessons, {
+    String? programId,
+  }) {
+    // Find first unread lesson or default to first
+    final nextLesson = lessons.isNotEmpty
+        ? lessons.firstWhere((l) => !l.isRead, orElse: () => lessons.first)
+        : null;
+
+    final nextLessonTitle = nextLesson != null
+        ? 'Lesson: ${nextLesson.title}'
         : 'Lesson: Mental Health Isn\'t Just Mental';
 
     return GestureDetector(
-      onTap: () => context.push(
-        RouteNames.phaseLearn,
-        extra: lessons.isNotEmpty ? lessons.first : null,
-      ),
+      onTap: () {
+        if (nextLesson != null) {
+          context.push(
+            RouteNames.lessonDetail,
+            extra: {
+              'lesson': nextLesson,
+              'lessonNumber': lessons.indexOf(nextLesson) + 1,
+              'totalLessons': lessons.length,
+              'programId': programId,
+            },
+          );
+        } else {
+          context.push(
+            RouteNames.phaseLearn,
+            extra: {
+              'lessons': lessons,
+              'programId': programId,
+            },
+          );
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

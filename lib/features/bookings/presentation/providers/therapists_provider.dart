@@ -4,6 +4,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/therapist_based_available_slots_resp.dart';
 import '../../data/models/therapists_list_resp.dart';
 import '../../data/repositories/therapists_repository.dart';
+import 'bookings_provider.dart';
 
 /// Provider for TherapistsRepository
 final therapistsRepositoryProvider = Provider<TherapistsRepository>((ref) {
@@ -11,11 +12,14 @@ final therapistsRepositoryProvider = Provider<TherapistsRepository>((ref) {
   return TherapistsRepository(dioClient: dioClient);
 });
 
-/// FutureProvider that fetches therapists list GET /therapists
+/// FutureProvider that fetches therapists list GET /therapists?focus=...
 final therapistsListProvider =
     FutureProvider<TherapistsListResp>((ref) async {
   final repository = ref.watch(therapistsRepositoryProvider);
-  return await repository.getTherapists();
+  final bookingState = ref.watch(bookingFormNotifierProvider);
+  return await repository.getTherapists(
+    focusAreas: bookingState.selectedFocusAreas,
+  );
 });
 
 /// FutureProviderFamily that fetches therapist available slots GET /therapists/{therapistId}/slots

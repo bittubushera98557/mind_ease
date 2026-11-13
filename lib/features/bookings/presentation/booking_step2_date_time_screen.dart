@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/therapist_based_available_slots_resp.dart';
+import '../data/models/therapists_list_resp.dart';
 import 'providers/bookings_provider.dart';
 import 'providers/therapists_provider.dart';
 
@@ -297,7 +298,7 @@ class _BookingStep2DateTimeScreenState
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Matched on ${formState.selectedFocusAreas.join(", ")}. Assigned automatically.',
+                      'Matched on ${formState.selectedFocusAreas.map(cleanFocusLabel).join(", ")}. Assigned automatically.',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w500,

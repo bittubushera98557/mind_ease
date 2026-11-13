@@ -10,10 +10,21 @@ class TherapistsRepository {
   TherapistsRepository({DioClient? dioClient})
       : _dioClient = dioClient ?? DioClient();
 
-  /// Fetches therapists list GET /therapists
-  Future<TherapistsListResp> getTherapists() async {
+  /// Fetches therapists list GET /therapists?focus=...
+  Future<TherapistsListResp> getTherapists({
+    List<String>? focusAreas,
+    String? focus,
+  }) async {
+    final Map<String, dynamic> queryParams = {};
+    if (focus != null && focus.isNotEmpty) {
+      queryParams['focus'] = focus;
+    } else if (focusAreas != null && focusAreas.isNotEmpty) {
+      queryParams['focus'] = focusAreas.join(',');
+    }
+
     final response = await _dioClient.get<TherapistsListResp>(
       ApiEndpoints.therapistsList,
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
       fromJson: (json) => TherapistsListResp.fromJson(json),
     );
 

@@ -126,6 +126,42 @@ class AuthRepository {
     return false;
   }
 
+  /// Fetches current user profile from GET /me
+  Future<UserModel> fetchCurrentUser() async {
+    final response = await _dioClient.get<UserModel>(
+      ApiEndpoints.currentUser,
+      fromJson: (json) {
+        if (json is Map<String, dynamic>) {
+          if (json.containsKey('user') && json['user'] is Map<String, dynamic>) {
+            return UserModel.fromJson(json['user'] as Map<String, dynamic>);
+          }
+          if (json.containsKey('data') && json['data'] is Map<String, dynamic>) {
+            return UserModel.fromJson(json['data'] as Map<String, dynamic>);
+          }
+          return UserModel.fromJson(json);
+        }
+        return const UserModel(id: '', name: '', email: '');
+      },
+    );
+
+    if (response.data != null) {
+      final user = response.data!;
+      await _storageService.saveUserData(
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mobile: user.mobile,
+        photo: user.photo,
+        createdAt: user.createdAt,
+      );
+      return user;
+    }
+
+    throw Exception(response.message ?? 'Failed to fetch user profile');
+  }
+
   Future<UserModel?> getStoredUser() async {
     final id = await _storageService.getUserId();
     final name = await _storageService.getUserName();

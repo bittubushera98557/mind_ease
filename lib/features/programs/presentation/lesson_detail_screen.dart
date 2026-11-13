@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,14 +7,16 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/program_detail_response_model.dart';
+import 'providers/programs_provider.dart';
 
-/// Lesson Detail Screen dynamically rendering lesson content
-class LessonDetailScreen extends StatelessWidget {
+/// Lesson Detail Screen dynamically rendering lesson content and marking as read
+class LessonDetailScreen extends ConsumerStatefulWidget {
   final PhaseLessonModel? lesson;
   final int lessonNumber;
   final int totalLessons;
   final String lessonTitle;
   final String duration;
+  final String? programId;
 
   const LessonDetailScreen({
     Key? key,
@@ -22,20 +25,89 @@ class LessonDetailScreen extends StatelessWidget {
     this.totalLessons = 3,
     this.lessonTitle = "Mental Health Isn't Just Mental",
     this.duration = "4 min read",
+    this.programId,
   }) : super(key: key);
 
   @override
+  ConsumerState<LessonDetailScreen> createState() => _LessonDetailScreenState();
+}
+
+class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
+  bool _isLoading = false;
+
+  Future<void> _markAsRead() async {
+    final effectiveProgramId = widget.programId?.isNotEmpty == true
+        ? widget.programId!
+        : 'mhfa';
+    final effectiveLessonId = widget.lesson?.id.isNotEmpty == true
+        ? widget.lesson!.id
+        : 'p1l${widget.lessonNumber}';
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await ref
+          .read(markLessonAsReadNotifierProvider.notifier)
+          .markLessonAsRead(
+            programId: effectiveProgramId,
+            lessonId: effectiveLessonId,
+          );
+
+      if (mounted) {
+        if (response != null && response.isSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lesson marked as read!'),
+              backgroundColor: AppColors.primary,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          context.pop(true);
+        } else {
+          final errMsg =
+              response?.error?.message ?? 'Failed to mark lesson as read';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errMsg),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error marking lesson as read: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final lesson = widget.lesson;
+    final lessonNumber = widget.lessonNumber;
+    final totalLessons = widget.totalLessons;
+
     final effectiveTitle = lesson?.title.isNotEmpty == true
         ? lesson!.title
-        : lessonTitle;
+        : widget.lessonTitle;
     final effectiveDuration = lesson?.minutes != null && lesson!.minutes > 0
-        ? '${lesson!.minutes} min read'
-        : duration;
+        ? '${lesson.minutes} min read'
+        : widget.duration;
     final introText = lesson?.intro ??
         'Mental health is how we think, feel and act. It affects how we handle stress, connect with people and make choices. And it doesn\'t stay in your head.';
-
-    final hasSections = lesson?.sections != null && lesson!.sections.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -147,8 +219,8 @@ class LessonDetailScreen extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     // Dynamic Sections or Fallback
-                    if (hasSections) ...[
-                      ...lesson!.sections.map((section) => _buildSection(section)),
+                    if (lesson != null && lesson.sections.isNotEmpty) ...[
+                      ...lesson.sections.map((section) => _buildSection(section)),
                     ] else ...[
                       Text(
                         'It shows up in three places',
@@ -179,8 +251,8 @@ class LessonDetailScreen extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     // Real-World Example Card
-                    if (lesson?.example != null && lesson!.example!.isNotEmpty)
-                      _buildExampleCard(lesson!.example!)
+                    if (lesson != null && lesson.example != null && lesson.example!.isNotEmpty)
+                      _buildExampleCard(lesson.example!)
                     else
                       _buildExampleCard(
                         "During a busy month at work, Sam sleeps badly, skips the gym and snaps at his housemate. None of that makes him a bad person. It's his mental health showing up in his body and habits.",
@@ -188,8 +260,8 @@ class LessonDetailScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     // Key Takeaway Card
-                    if (lesson?.takeaway != null && lesson!.takeaway!.isNotEmpty)
-                      _buildTakeawayCard(lesson!.takeaway!)
+                    if (lesson != null && lesson.takeaway != null && lesson.takeaway!.isNotEmpty)
+                      _buildTakeawayCard(lesson.takeaway!)
                     else
                       _buildTakeawayCard(
                         "Mental health is part of your overall health. Noticing it in your body and habits is the first skill.",
@@ -214,9 +286,9 @@ class LessonDetailScreen extends StatelessWidget {
                 children: [
                   AppButton(
                     text: "✓ I've read this lesson",
-                    onPressed: () {
-                      context.pop();
-                    },
+                    showArrow: false,
+                    isLoading: _isLoading,
+                    onPressed: _isLoading ? null : _markAsRead,
                   ),
                 ],
               ),

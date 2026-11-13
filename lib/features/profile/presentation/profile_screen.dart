@@ -19,18 +19,24 @@ class ProfileScreen extends ConsumerWidget {
     final user = authState.user;
     final userPointsAsync = ref.watch(userPointsProvider);
 
-    final userName =
-        user?.name.isNotEmpty == true ? user!.name : 'Ramsy Saikrishna';
-    final userEmail = user?.email.isNotEmpty == true
-        ? user!.email
-        : 'ramsy@hyperiontech.com';
-    final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : 'R';
+    final userName = user?.name.isNotEmpty == true
+        ? user!.name
+        : (user?.firstName?.isNotEmpty == true
+            ? '${user!.firstName} ${user.lastName ?? ''}'.trim()
+            : 'User');
+    final userEmail = user?.email ?? '';
+    final userInitial = (user?.firstName?.isNotEmpty == true
+        ? user!.firstName![0]
+        : (userName.isNotEmpty ? userName[0] : 'U')).toUpperCase();
     final userPhoto = user?.photo;
+    debugPrint("profileScreen build=${userPhoto?.toString()}");
+
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
         onRefresh: () async {
+          await ref.read(authNotifierProvider.notifier).fetchCurrentUser();
           ref.invalidate(userPointsProvider);
         },
         color: AppColors.primary,
@@ -200,6 +206,7 @@ class ProfileScreen extends ConsumerWidget {
     String initial,
     String? photo,
   ) {
+    debugPrint("_buildHeader=$photo");
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(

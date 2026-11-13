@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../data/models/assessment_response_model.dart';
 import '../data/models/onboarding_questionnaire_model.dart';
 import 'providers/questionnaire_provider.dart';
 
@@ -192,15 +193,19 @@ class _QuestionnaireSurveyScreenState
       _isSubmitting = true;
     });
 
+    AssessmentResponseModel? response;
     try {
       final repository = ref.read(questionnaireRepositoryProvider);
-      await repository.submitAssessmentStep(
+      response = await repository.submitAssessmentStep(
         answers: currentAnswers,
         step: _currentIndex,
         completedAt: isLast ? DateTime.now().toUtc().toIso8601String() : null,
         nextStepsSeen: isLast,
         questionnaireVersion: version,
       );
+      if (isLast && response.isSuccess) {
+        ref.read(lastAssessmentResponseProvider.notifier).state = response;
+      }
     } catch (e) {
       debugPrint('Error submitting assessment step: $e');
     } finally {
@@ -210,7 +215,7 @@ class _QuestionnaireSurveyScreenState
         });
 
         if (isLast) {
-          context.push(RouteNames.questionnaireResults);
+          context.push(RouteNames.questionnaireResults, extra: response);
         } else {
           setState(() {
             _currentIndex++;

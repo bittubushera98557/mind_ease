@@ -12,11 +12,13 @@ import '../data/models/program_detail_response_model.dart';
 class PhaseLearnScreen extends StatelessWidget {
   final List<PhaseLessonModel>? lessons;
   final int phaseNumber;
+  final String? programId;
 
   const PhaseLearnScreen({
     Key? key,
     this.lessons,
     this.phaseNumber = 1,
+    this.programId,
   }) : super(key: key);
 
   static const List<_LessonData> _defaultLessons = [
@@ -148,6 +150,7 @@ class PhaseLearnScreen extends StatelessWidget {
           'lesson': lesson,
           'lessonNumber': lessonNumber,
           'totalLessons': totalLessons,
+          'programId': programId,
         },
       ),
       child: Container(
@@ -171,9 +174,20 @@ class PhaseLearnScreen extends StatelessWidget {
               width: 26,
               height: 26,
               decoration: BoxDecoration(
+                color: lesson.isRead ? AppColors.primary : Colors.transparent,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.inputBorder, width: 1.5),
+                border: Border.all(
+                  color: lesson.isRead ? AppColors.primary : AppColors.inputBorder,
+                  width: 1.5,
+                ),
               ),
+              child: lesson.isRead
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    )
+                  : null,
             ),
             const SizedBox(width: 16),
 
@@ -201,11 +215,11 @@ class PhaseLearnScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Not started',
+                    lesson.isRead ? 'Completed' : 'Not started',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      color: lesson.isRead ? const Color(0xFF4C7B3B) : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -227,7 +241,14 @@ class PhaseLearnScreen extends StatelessWidget {
 
   Widget _buildLessonCard(BuildContext context, _LessonData lesson) {
     return GestureDetector(
-      onTap: () => context.push(RouteNames.lessonDetail),
+      onTap: () => context.push(
+        RouteNames.lessonDetail,
+        extra: {
+          'lessonNumber': lesson.number,
+          'totalLessons': 3,
+          'programId': programId,
+        },
+      ),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
