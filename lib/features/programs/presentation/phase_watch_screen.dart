@@ -9,6 +9,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../../dashboard/presentation/providers/config_provider.dart';
 import '../data/models/program_detail_response_model.dart';
+import 'providers/programs_provider.dart';
 
 /// Phase Watch Screen dynamically displaying phase videos and using config API
 class PhaseWatchScreen extends ConsumerWidget {
@@ -51,11 +52,26 @@ class PhaseWatchScreen extends ConsumerWidget {
     final videoCompletePercent =
         configAsync.valueOrNull?.videoCompletePercent ?? 90;
 
-    final hasDynamicVideos = videos != null && videos!.isNotEmpty;
+    final effectiveProgramId = programId?.isNotEmpty == true ? programId! : 'mhfa';
+    final detailAsync = ref.watch(programDetailProvider(effectiveProgramId));
+
+    List<PhaseVideoModel>? activeVideos = videos;
+    if (detailAsync.hasValue && detailAsync.value != null) {
+      final phases = detailAsync.value!.phases;
+      final targetPhase = phases.firstWhere(
+        (p) => p.number == phaseNumber,
+        orElse: () => phases.isNotEmpty ? phases[0] : const ProgramPhaseModel(),
+      );
+      if (targetPhase.videos.isNotEmpty) {
+        activeVideos = targetPhase.videos;
+      }
+    }
+
+    final hasDynamicVideos = activeVideos != null && activeVideos.isNotEmpty;
     final totalVideos =
-        hasDynamicVideos ? videos!.length : _defaultVideos.length;
+        hasDynamicVideos ? activeVideos.length : _defaultVideos.length;
     final watchedVideosCount = hasDynamicVideos
-        ? videos!.where((v) => v.isVideoWatched).length
+        ? activeVideos.where((v) => v.isVideoWatched).length
         : 0;
 
     return Scaffold(
@@ -119,15 +135,15 @@ class PhaseWatchScreen extends ConsumerWidget {
 
               // Video Cards
               if (hasDynamicVideos)
-                ...List.generate(videos!.length, (index) {
-                  final video = videos![index];
+                ...List.generate(activeVideos.length, (index) {
+                  final video = activeVideos![index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: _buildDynamicVideoCard(
                       context,
                       video,
                       index + 1,
-                      videos!.length,
+                      activeVideos.length,
                       videoCompletePercent,
                     ),
                   );
@@ -332,6 +348,7 @@ class PhaseWatchScreen extends ConsumerWidget {
             'videoDescription': video.description,
             'duration': video.duration,
             'videoCompletePercent': videoCompletePercent,
+            'programId': programId,
           },
         );
       },

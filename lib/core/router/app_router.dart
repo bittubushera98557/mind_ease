@@ -26,6 +26,7 @@ import '../../features/programs/presentation/video_detail_screen.dart';
 import '../../features/support/presentation/support_options_screen.dart';
 import '../../features/profile/presentation/personal_information_screen.dart';
 import '../../features/profile/presentation/change_password_screen.dart';
+import '../../features/profile/presentation/delete_account_screen.dart';
 import '../../features/profile/presentation/privacy_policy_screen.dart';
 import '../../features/profile/presentation/terms_of_use_screen.dart';
 import '../../features/bookings/presentation/booking_step1_focus_screen.dart';
@@ -151,6 +152,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.changePassword,
         pageBuilder: (context, state) => _buildPage(const ChangePasswordScreen(), state),
+      ),
+      GoRoute(
+        path: RouteNames.deleteAccount,
+        pageBuilder: (context, state) => _buildPage(const DeleteAccountScreen(), state),
       ),
       GoRoute(
         path: RouteNames.privacyPolicy,
@@ -327,7 +332,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.phaseActivity,
-        pageBuilder: (context, state) => _buildPage(const PhaseActivityScreen(), state),
+        pageBuilder: (context, state) {
+          PhaseActivityModel? activity;
+          int phaseNumber = 1;
+          String? programId;
+          String? phaseId;
+
+          if (state.extra is PhaseActivityModel) {
+            activity = state.extra as PhaseActivityModel;
+          } else if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            if (map['activity'] is PhaseActivityModel) {
+              activity = map['activity'] as PhaseActivityModel;
+            }
+            if (map['phaseNumber'] is int) {
+              phaseNumber = map['phaseNumber'] as int;
+            }
+            if (map['programId'] is String) {
+              programId = map['programId'] as String;
+            }
+            if (map['phaseId'] is String) {
+              phaseId = map['phaseId'] as String;
+            }
+          }
+
+          return _buildPage(
+            PhaseActivityScreen(
+              activity: activity,
+              phaseNumber: phaseNumber,
+              programId: programId,
+              phaseId: phaseId,
+            ),
+            state,
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.phaseQuiz,
@@ -409,6 +447,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           if (extra?['video'] is PhaseVideoModel) {
             video = extra!['video'] as PhaseVideoModel;
           }
+          final String? programId = extra?['programId'] as String?;
+          final String? videoId = extra?['videoId'] as String? ?? video?.id;
+
           return _buildPage(
             VideoDetailScreen(
               video: video,
@@ -426,6 +467,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               mediaUrl: extra?['mediaUrl'] ?? video?.mediaUrl,
               thumbnailUrl: extra?['thumbnailUrl'] ?? video?.thumbnailUrl,
               videoCompletePercent: extra?['videoCompletePercent'] ?? 90,
+              programId: programId,
+              videoId: videoId,
             ),
             state,
           );

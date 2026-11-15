@@ -24,6 +24,8 @@ class AppointmentModel {
   final double totalAmount;
   final String bookingRef;
   final String? therapistNotes;
+  final String? paymentToken;
+  final String? paymentMethod;
 
   const AppointmentModel({
     required this.id,
@@ -41,6 +43,8 @@ class AppointmentModel {
     required this.totalAmount,
     required this.bookingRef,
     this.therapistNotes,
+    this.paymentToken,
+    this.paymentMethod,
   });
 }
 
@@ -59,12 +63,12 @@ class BookingFormState {
   final Slot? selectedSlotObj;
 
   BookingFormState({
-    this.selectedFocusAreas = const ['Stress', 'Sleep'],
+    this.selectedFocusAreas = const ['stress', 'sleep'],
     this.therapistNotes = '',
     this.mentalHealthPlanOption = 'No',
     DateTime? selectedDate,
     this.selectedTimeSlot = '10:00 am',
-    this.mobileNumber = '04XX XXX XXX',
+    this.mobileNumber = '04',
     this.paymentMethod = 'Apple Pay',
     this.telehealthConsent = true,
     this.privacyConsent = true,

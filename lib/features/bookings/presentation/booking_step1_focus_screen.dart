@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/appointment_model.dart';
+import '../data/models/focus_area_resp.dart';
 import 'providers/bookings_provider.dart';
 import 'providers/focus_areas_provider.dart';
 
@@ -25,16 +26,16 @@ class _BookingStep1FocusScreenState
     extends ConsumerState<BookingStep1FocusScreen> {
   late final TextEditingController _notesController;
 
-  final List<String> _fallbackFocusOptions = const [
-    'Stress',
-    'Sleep',
-    'Anxiety',
-    'Low mood',
-    'Work and burnout',
-    'Relationships',
-    'Grief and loss',
-    'Life changes',
-    'Not sure yet',
+  static final List<FocusAreaResp> _fallbackFocusAreas = [
+    FocusAreaResp(key: 'stress', label: 'Stress'),
+    FocusAreaResp(key: 'sleep', label: 'Sleep'),
+    FocusAreaResp(key: 'anxiety', label: 'Anxiety'),
+    FocusAreaResp(key: 'low_mood', label: 'Low mood'),
+    FocusAreaResp(key: 'work_burnout', label: 'Work and burnout'),
+    FocusAreaResp(key: 'relationships', label: 'Relationships'),
+    FocusAreaResp(key: 'grief_loss', label: 'Grief and loss'),
+    FocusAreaResp(key: 'life_changes', label: 'Life changes'),
+    FocusAreaResp(key: 'not_sure', label: 'Not sure yet'),
   ];
 
   @override
@@ -51,7 +52,7 @@ class _BookingStep1FocusScreenState
   }
 
   Widget _buildFocusChipsWrap(
-    List<String> options,
+    List<FocusAreaResp> options,
     BookingFormState formState,
     BookingFormNotifier formNotifier,
   ) {
@@ -59,12 +60,12 @@ class _BookingStep1FocusScreenState
       spacing: 10,
       runSpacing: 10,
       children: options.map((option) {
-        final isSelected = formState.selectedFocusAreas.contains(option);
+        final isSelected = formState.selectedFocusAreas.contains(option.key);
         return FilterChip(
-          label: Text(option),
+          label: Text(option.label),
           selected: isSelected,
           onSelected: (_) {
-            formNotifier.toggleFocusArea(option);
+            formNotifier.toggleFocusArea(option.key);
           },
           labelStyle: GoogleFonts.plusJakartaSans(
             fontSize: 13,
@@ -194,23 +195,23 @@ class _BookingStep1FocusScreenState
               // Dynamic Focus Chips Wrap
               focusAreasAsync.when(
                 data: (focusAreas) {
-                  final options = focusAreas.isNotEmpty
-                      ? focusAreas.map((f) => f.label).toList()
-                      : _fallbackFocusOptions;
+                  final items = focusAreas.isNotEmpty
+                      ? focusAreas
+                      : _fallbackFocusAreas;
 
                   return _buildFocusChipsWrap(
-                    options,
+                    items,
                     formState,
                     formNotifier,
                   );
                 },
                 loading: () => _buildFocusChipsWrap(
-                  _fallbackFocusOptions,
+                  _fallbackFocusAreas,
                   formState,
                   formNotifier,
                 ),
                 error: (_, __) => _buildFocusChipsWrap(
-                  _fallbackFocusOptions,
+                  _fallbackFocusAreas,
                   formState,
                   formNotifier,
                 ),

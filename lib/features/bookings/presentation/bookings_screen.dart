@@ -15,33 +15,147 @@ class BookingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedTab = ref.watch(bookingsTabProvider);
-    final appointments = ref.watch(appointmentsNotifierProvider);
-
-    final upcomingList = appointments
-        .where((a) => a.status == AppointmentStatus.upcoming)
-        .toList();
-    final pastList = appointments
-        .where((a) => a.status != AppointmentStatus.upcoming)
-        .toList();
+    final bookingsAsync = ref.watch(myBookingsProvider);
+    final localAppointments = ref.watch(appointmentsNotifierProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          // Header with Pill Switcher
-          _buildHeader(context, ref, selectedTab, upcomingList.length, pastList.length),
+      body: bookingsAsync.when(
+        data: (appointmentsList) {
+          final effectiveList = appointmentsList.isNotEmpty ? appointmentsList : localAppointments;
+          final upcomingList = effectiveList
+              .where((a) => a.status == AppointmentStatus.upcoming)
+              .toList();
+          final pastList = effectiveList
+              .where((a) => a.status != AppointmentStatus.upcoming)
+              .toList();
 
-          // Body Content
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-              child: selectedTab == 0
-                  ? _buildUpcomingView(context, ref, upcomingList)
-                  : _buildPastView(context, ref, pastList),
-            ),
-          ),
-        ],
+          return Column(
+            children: [
+              _buildHeader(context, ref, selectedTab, upcomingList.length, pastList.length),
+              Expanded(
+                child: RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () async {
+                    ref.invalidate(myBookingsProvider);
+                  },
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                    child: selectedTab == 0
+                        ? _buildUpcomingView(context, ref, upcomingList)
+                        : _buildPastView(context, ref, pastList),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+        loading: () {
+          final upcomingList = localAppointments
+              .where((a) => a.status == AppointmentStatus.upcoming)
+              .toList();
+          final pastList = localAppointments
+              .where((a) => a.status != AppointmentStatus.upcoming)
+              .toList();
+
+          return Column(
+            children: [
+              _buildHeader(context, ref, selectedTab, upcomingList.length, pastList.length),
+              const Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              ),
+            ],
+          );
+        },
+        error: (err, stack) {
+          final upcomingList = localAppointments
+              .where((a) => a.status == AppointmentStatus.upcoming)
+              .toList();
+          final pastList = localAppointments
+              .where((a) => a.status != AppointmentStatus.upcoming)
+              .toList();
+
+          if (localAppointments.isNotEmpty) {
+            return Column(
+              children: [
+                _buildHeader(context, ref, selectedTab, upcomingList.length, pastList.length),
+                Expanded(
+                  child: RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () async {
+                      ref.invalidate(myBookingsProvider);
+                    },
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                      child: selectedTab == 0
+                          ? _buildUpcomingView(context, ref, upcomingList)
+                          : _buildPastView(context, ref, pastList),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return Column(
+            children: [
+              _buildHeader(context, ref, selectedTab, 0, 0),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: AppColors.alertErrorText,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Failed to load bookings',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          err.toString(),
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            ref.invalidate(myBookingsProvider);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                          ),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -146,28 +260,70 @@ class BookingsScreen extends ConsumerWidget {
     WidgetRef ref,
     List<AppointmentModel> upcomingList,
   ) {
+    if (upcomingList.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('NEXT SESSION'),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+            child: Center(
+              child: Text(
+                'No Upcoming Booking',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildBookSessionButton(context),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 14,
+                  color: AppColors.textTertiary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    "We'll remind you 24 hours and 15 minutes before each session.",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      );
+    }
+
     final nextSession = upcomingList.firstWhere(
       (a) => a.isNextSession,
-      orElse: () => upcomingList.isNotEmpty
-          ? upcomingList.first
-          : const AppointmentModel(
-              id: 'temp',
-              therapistName: 'Dr Priya Nair',
-              therapistRole: 'Clinical Psychologist',
-              therapistInitials: 'PN',
-              dateString: 'Wed 4 Nov',
-              dateBadge: 'NOV 4',
-              timeString: '10:00 - 10:30 am',
-              duration: '30 min video',
-              format: 'Video in MindEase',
-              status: AppointmentStatus.upcoming,
-              isNextSession: true,
-              totalAmount: 180.0,
-              bookingRef: 'ME-BK-020125',
-            ),
+      orElse: () => upcomingList.first,
     );
 
-    final laterSessions = upcomingList.where((a) => !a.isNextSession).toList();
+    final laterSessions = upcomingList
+        .where((a) => a.id != nextSession.id)
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -151,10 +151,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Delete current user account
-  Future<bool> deleteAccount() async {
+  Future<bool> deleteAccount({String? password}) async {
     state = AuthState.loading();
     try {
-      await _repository.deleteAccount();
+      await _repository.deleteAccount(password: password);
       state = AuthState.unauthenticated();
       return true;
     } on ApiException catch (e) {

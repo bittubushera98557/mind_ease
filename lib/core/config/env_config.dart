@@ -11,6 +11,7 @@ class EnvConfig {
   final String apiBaseUrl;
   final Duration apiTimeout;
   final bool enableLogging;
+  final String stripePublishableKey;
 
   static late EnvConfig _instance;
   static EnvConfig get instance => _instance;
@@ -23,6 +24,7 @@ class EnvConfig {
     required this.apiBaseUrl,
     required this.apiTimeout,
     required this.enableLogging,
+    required this.stripePublishableKey,
   });
 
   static void initialize({
@@ -30,7 +32,11 @@ class EnvConfig {
     String? customBaseUrl,
     Duration? customTimeout,
     bool? enableLogging,
+    String? stripePublishableKey,
   }) {
+    const defaultStripeKey = 'pk_test_51P2poYFOjqYjuziSQehIuAQksSaw3hKCtNnK5r7mrLs5xwS6ULXbNQJCDmPwdUISPMzqvxdMvzl5g2sHZHpDk4zq00YjLu4h6C'; // Test Stripe Publishable Key
+    // const defaultStripeKey = 'pk_test_51Mz2xSGB582kSKxQ32847923847923849'; // Test Stripe Publishable Key
+
     switch (environment) {
       case AppEnvironment.dev:
         _instance = EnvConfig._(
@@ -39,6 +45,7 @@ class EnvConfig {
           apiBaseUrl: customBaseUrl ?? 'https://api.mindease.me/v1',
           apiTimeout: customTimeout ?? const Duration(seconds: 30),
           enableLogging: enableLogging ?? true,
+          stripePublishableKey: stripePublishableKey ?? defaultStripeKey,
         );
         break;
       case AppEnvironment.staging:
@@ -48,6 +55,7 @@ class EnvConfig {
           apiBaseUrl: customBaseUrl ?? 'https://api.mindease.me/v1',
           apiTimeout: customTimeout ?? const Duration(seconds: 30),
           enableLogging: enableLogging ?? true,
+          stripePublishableKey: stripePublishableKey ?? defaultStripeKey,
         );
         break;
       case AppEnvironment.prod:
@@ -57,6 +65,7 @@ class EnvConfig {
           apiBaseUrl: customBaseUrl ?? 'https://api.mindease.me/v1',
           apiTimeout: customTimeout ?? const Duration(seconds: 15),
           enableLogging: enableLogging ?? false,
+          stripePublishableKey: stripePublishableKey ?? defaultStripeKey,
         );
         break;
     }

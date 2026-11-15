@@ -25,6 +25,7 @@ class ApiEndpoints {
   static const String meAssessment = '/me/assessment'; // it will be hit with bearer token
   static const String tokenRefresh = '/auth/refresh'; // {"refreshToken": "string" }
   static const String bookings = '/me/bookings';
+
   static const String config = '/config';
   static const String questionnairesOnboarding = '/questionnaires/onboarding';
   static const String programs = '/programs';
@@ -38,9 +39,9 @@ class ApiEndpoints {
   static const String therapistsDetailById = '/therapists/{therapistId}';
   static const String therapistBasedSlotsApi = '/therapists/{therapistId}/slots';
 
-
-
-  // static const String dashboard = '/panel/dashboard';
+  static const String saveActivity = '/me/programs/{programId}/activities/{activityId}';
+  static const String videoProgress = '/me/programs/{programId}/videos/{videoId}/progress';
+  static const String submitQuiz = '/me/programs/{programId}/quizzes/{quizId}/submit';
 
   // Telehealth / Zoom Video SDK Token endpoint
   static const String telehealthToken = '/telehealth/token';

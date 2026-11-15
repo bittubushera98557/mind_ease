@@ -23,6 +23,7 @@ class RouteNames {
   // Profile Sub-screens
   static const String personalInformation = '/profile/personal-information';
   static const String changePassword = '/profile/change-password';
+  static const String deleteAccount = '/profile/delete-account';
   static const String privacyPolicy = '/profile/privacy-policy';
   static const String termsOfUse = '/profile/terms-of-use';
 

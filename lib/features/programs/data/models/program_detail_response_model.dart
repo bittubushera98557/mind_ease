@@ -1,3 +1,5 @@
+import 'program_progress_response_model.dart';
+
 /// Model representing full program detail response from /programs/{programId}
 class ProgramDetailResponseModel {
   final String id;
@@ -11,6 +13,7 @@ class ProgramDetailResponseModel {
   final int displayOrder;
   final String? coverImage;
   final List<ProgramPhaseModel> phases;
+  final int? userPoints;
   final ApiErrorModel? error;
 
   const ProgramDetailResponseModel({
@@ -25,6 +28,7 @@ class ProgramDetailResponseModel {
     this.displayOrder = 0,
     this.coverImage,
     this.phases = const [],
+    this.userPoints,
     this.error,
   });
 
@@ -65,6 +69,9 @@ class ProgramDetailResponseModel {
       displayOrder: _parseInt(json['displayOrder']),
       coverImage: json['coverImage']?.toString(),
       phases: phasesList,
+      userPoints: json['userPoints'] is num
+          ? (json['userPoints'] as num).toInt()
+          : (json['points'] is num ? (json['points'] as num).toInt() : null),
     );
   }
 
@@ -72,6 +79,59 @@ class ProgramDetailResponseModel {
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value) ?? 0;
     return 0;
+  }
+
+  ProgramDetailResponseModel copyWith({
+    String? id,
+    String? title,
+    String? short,
+    String? intro,
+    List<String>? learn,
+    String? disclaimer,
+    String? status,
+    String? contentVersion,
+    int? displayOrder,
+    String? coverImage,
+    List<ProgramPhaseModel>? phases,
+    int? userPoints,
+    ApiErrorModel? error,
+  }) {
+    return ProgramDetailResponseModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      short: short ?? this.short,
+      intro: intro ?? this.intro,
+      learn: learn ?? this.learn,
+      disclaimer: disclaimer ?? this.disclaimer,
+      status: status ?? this.status,
+      contentVersion: contentVersion ?? this.contentVersion,
+      displayOrder: displayOrder ?? this.displayOrder,
+      coverImage: coverImage ?? this.coverImage,
+      phases: phases ?? this.phases,
+      userPoints: userPoints ?? this.userPoints,
+      error: error ?? this.error,
+    );
+  }
+
+  /// Merges updated progress data (from submission APIs) into current program detail
+  ProgramDetailResponseModel applyProgress(ProgramProgressDataModel progress) {
+    final updatedPhases = phases.map((phase) {
+      PhaseProgressModel? phaseProgress = progress.phases[phase.id];
+      if (phaseProgress == null) {
+        final key = 'p${phase.number > 0 ? phase.number : (phases.indexOf(phase) + 1)}';
+        phaseProgress = progress.phases[key];
+      }
+
+      if (phaseProgress != null) {
+        return phase.applyProgress(phaseProgress);
+      }
+      return phase;
+    }).toList();
+
+    return copyWith(
+      phases: updatedPhases,
+      userPoints: progress.points > 0 ? progress.points : userPoints,
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -92,6 +152,7 @@ class ProgramDetailResponseModel {
       'displayOrder': displayOrder,
       if (coverImage != null) 'coverImage': coverImage,
       'phases': phases.map((p) => p.toJson()).toList(),
+      if (userPoints != null) 'userPoints': userPoints,
     };
   }
 }
@@ -203,6 +264,152 @@ class ProgramPhaseModel {
     return 0;
   }
 
+  ProgramPhaseModel copyWith({
+    String? id,
+    int? number,
+    String? title,
+    String? description,
+    List<String>? objectives,
+    String? color,
+    int? pointsAwarded,
+    List<PhaseLessonModel>? lessons,
+    List<PhaseVideoModel>? videos,
+    PhaseActivityModel? activity,
+    PhaseQuizModel? quiz,
+    UnlockRequirementsModel? unlockRequirements,
+  }) {
+    return ProgramPhaseModel(
+      id: id ?? this.id,
+      number: number ?? this.number,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      objectives: objectives ?? this.objectives,
+      color: color ?? this.color,
+      pointsAwarded: pointsAwarded ?? this.pointsAwarded,
+      lessons: lessons ?? this.lessons,
+      videos: videos ?? this.videos,
+      activity: activity ?? this.activity,
+      quiz: quiz ?? this.quiz,
+      unlockRequirements: unlockRequirements ?? this.unlockRequirements,
+    );
+  }
+
+  /// Merges PhaseProgressModel into this phase instance
+  ProgramPhaseModel applyProgress(PhaseProgressModel phaseProgress) {
+    // Update lessons
+    final updatedLessons = lessons.map((lesson) {
+      bool isRead = lesson.isRead;
+      if (phaseProgress.lessons.containsKey(lesson.id)) {
+        final item = phaseProgress.lessons[lesson.id];
+        if (item?.readAt != null && item!.readAt!.isNotEmpty) {
+          isRead = true;
+        }
+      }
+      if (phaseProgress.counts?.lessons != null &&
+          phaseProgress.counts!.lessons!.done >= lessons.length &&
+          lessons.isNotEmpty) {
+        isRead = true;
+      }
+      return lesson.copyWith(isRead: isRead);
+    }).toList();
+
+    // Update videos
+    final updatedVideos = videos.map((video) {
+      bool isWatched = video.isVideoWatched;
+      if (phaseProgress.videos.containsKey(video.id)) {
+        final vVal = phaseProgress.videos[video.id];
+        if (vVal is Map<String, dynamic>) {
+          final percent = vVal['percent'];
+          final completedAt = vVal['completedAt'];
+          final watchedSecs = vVal['watchedSeconds'] ?? vVal['position'];
+
+          if (percent == 100 ||
+              (completedAt != null && completedAt.toString().isNotEmpty) ||
+              (watchedSecs is num && video.duration > 0 && watchedSecs >= video.duration)) {
+            isWatched = true;
+          }
+        } else if (vVal == true) {
+          isWatched = true;
+        }
+      }
+      if (phaseProgress.counts?.videos != null &&
+          phaseProgress.counts!.videos!.done >= videos.length &&
+          videos.isNotEmpty) {
+        isWatched = true;
+      }
+      return video.copyWith(isVideoWatched: isWatched);
+    }).toList();
+
+    // Update activity
+    PhaseActivityModel? updatedActivity = activity;
+    if (activity != null) {
+      bool isCompleted = activity!.isCompleted;
+      bool isDraft = activity!.isDraft;
+      List<PhaseActivityPromptModel> updatedPrompts = activity!.prompts;
+
+      if (phaseProgress.activity != null) {
+        if (phaseProgress.activity is Map<String, dynamic>) {
+          final actMap = phaseProgress.activity as Map<String, dynamic>;
+          isCompleted = actMap['complete'] == true;
+          isDraft = actMap['complete'] == false;
+
+          final rawAnswers = actMap['answers'];
+          if (rawAnswers is Map<String, dynamic> && updatedPrompts.isNotEmpty) {
+            updatedPrompts = updatedPrompts.map((prompt) {
+              final qId = prompt.id.isNotEmpty ? prompt.id : 'q${updatedPrompts.indexOf(prompt) + 1}';
+              if (rawAnswers.containsKey(qId) || rawAnswers.containsKey(prompt.id)) {
+                final answerJson = rawAnswers[qId] ?? rawAnswers[prompt.id];
+                final parsedAnswer = PhaseActivityPromptAnswerModel.fromJson(answerJson);
+                return prompt.copyWith(answer: parsedAnswer);
+              }
+              return prompt;
+            }).toList();
+          }
+        } else if (phaseProgress.activity == true) {
+          isCompleted = true;
+        }
+      }
+      if (phaseProgress.counts?.activity == true) {
+        isCompleted = true;
+      }
+
+      updatedActivity = activity!.copyWith(
+        isCompleted: isCompleted,
+        isDraft: isDraft,
+        prompts: updatedPrompts,
+      );
+    }
+
+    // Update quiz
+    PhaseQuizModel? updatedQuiz = quiz;
+    if (quiz != null) {
+      bool isPassed = quiz!.isPassed;
+      bool isCompleted = quiz!.isCompleted;
+
+      if (phaseProgress.quiz != null) {
+        isPassed = phaseProgress.quiz!.passed;
+        isCompleted = phaseProgress.quiz!.passed || phaseProgress.quiz!.attempts.isNotEmpty;
+      }
+      if (phaseProgress.counts?.quiz == true) {
+        isPassed = true;
+        isCompleted = true;
+      }
+
+      updatedQuiz = quiz!.copyWith(
+        isPassed: isPassed,
+        isCompleted: isCompleted,
+      );
+    }
+
+    return copyWith(
+      lessons: updatedLessons,
+      videos: updatedVideos,
+      activity: updatedActivity,
+      quiz: updatedQuiz,
+      pointsAwarded: phaseProgress.pointsAwarded ?? pointsAwarded,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -273,6 +480,30 @@ class PhaseLessonModel {
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value) ?? 0;
     return 0;
+  }
+
+  PhaseLessonModel copyWith({
+    String? id,
+    String? title,
+    int? minutes,
+    String? intro,
+    bool? isRead,
+    List<PhaseLessonSectionModel>? sections,
+    String? example,
+    String? takeaway,
+    int? displayOrder,
+  }) {
+    return PhaseLessonModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      minutes: minutes ?? this.minutes,
+      intro: intro ?? this.intro,
+      isRead: isRead ?? this.isRead,
+      sections: sections ?? this.sections,
+      example: example ?? this.example,
+      takeaway: takeaway ?? this.takeaway,
+      displayOrder: displayOrder ?? this.displayOrder,
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -402,6 +633,28 @@ class PhaseVideoModel {
     return 0;
   }
 
+  PhaseVideoModel copyWith({
+    String? id,
+    String? title,
+    String? description,
+    int? duration,
+    String? mediaUrl,
+    String? thumbnailUrl,
+    CompletionRuleModel? completionRule,
+    bool? isVideoWatched,
+  }) {
+    return PhaseVideoModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      duration: duration ?? this.duration,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      completionRule: completionRule ?? this.completionRule,
+      isVideoWatched: isVideoWatched ?? this.isVideoWatched,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -457,6 +710,26 @@ class PhaseActivityModel {
     );
   }
 
+  PhaseActivityModel copyWith({
+    String? id,
+    String? title,
+    String? purpose,
+    String? instructions,
+    bool? isDraft,
+    bool? isCompleted,
+    List<PhaseActivityPromptModel>? prompts,
+  }) {
+    return PhaseActivityModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      purpose: purpose ?? this.purpose,
+      instructions: instructions ?? this.instructions,
+      isDraft: isDraft ?? this.isDraft,
+      isCompleted: isCompleted ?? this.isCompleted,
+      prompts: prompts ?? this.prompts,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -470,6 +743,41 @@ class PhaseActivityModel {
   }
 }
 
+/// Model representing answer data in a phase activity prompt
+class PhaseActivityPromptAnswerModel {
+  final String? text;
+  final List<String> chips;
+
+  const PhaseActivityPromptAnswerModel({
+    this.text,
+    this.chips = const [],
+  });
+
+  factory PhaseActivityPromptAnswerModel.fromJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      final rawChips = json['chips'];
+      List<String> chipsList = [];
+      if (rawChips is List) {
+        chipsList = rawChips.map((e) => e.toString()).toList();
+      }
+      return PhaseActivityPromptAnswerModel(
+        text: json['text']?.toString(),
+        chips: chipsList,
+      );
+    } else if (json is String) {
+      return PhaseActivityPromptAnswerModel(text: json);
+    }
+    return const PhaseActivityPromptAnswerModel();
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (text != null) 'text': text,
+      'chips': chips,
+    };
+  }
+}
+
 /// Model representing a prompt in a phase activity
 class PhaseActivityPromptModel {
   final String id;
@@ -477,7 +785,7 @@ class PhaseActivityPromptModel {
   final List<String> chips;
   final bool optional;
   final String? responseType;
-  final String? answer;
+  final PhaseActivityPromptAnswerModel? answer;
 
   const PhaseActivityPromptModel({
     this.id = '',
@@ -488,11 +796,22 @@ class PhaseActivityPromptModel {
     this.answer,
   });
 
+  /// Helper getter for prompt text answer
+  String? get savedText => answer?.text;
+
+  /// Helper getter for prompt selected chips
+  List<String> get savedChips => answer?.chips ?? const [];
+
   factory PhaseActivityPromptModel.fromJson(Map<String, dynamic> json) {
     final rawChips = json['chips'];
     List<String> chipsList = [];
     if (rawChips is List) {
       chipsList = rawChips.map((e) => e.toString()).toList();
+    }
+
+    PhaseActivityPromptAnswerModel? parsedAnswer;
+    if (json.containsKey('answer') && json['answer'] != null) {
+      parsedAnswer = PhaseActivityPromptAnswerModel.fromJson(json['answer']);
     }
 
     return PhaseActivityPromptModel(
@@ -501,7 +820,25 @@ class PhaseActivityPromptModel {
       chips: chipsList,
       optional: json['optional'] != false,
       responseType: json['responseType']?.toString(),
-      answer: json['answer']?.toString(),
+      answer: parsedAnswer,
+    );
+  }
+
+  PhaseActivityPromptModel copyWith({
+    String? id,
+    String? q,
+    List<String>? chips,
+    bool? optional,
+    String? responseType,
+    PhaseActivityPromptAnswerModel? answer,
+  }) {
+    return PhaseActivityPromptModel(
+      id: id ?? this.id,
+      q: q ?? this.q,
+      chips: chips ?? this.chips,
+      optional: optional ?? this.optional,
+      responseType: responseType ?? this.responseType,
+      answer: answer ?? this.answer,
     );
   }
 
@@ -512,7 +849,7 @@ class PhaseActivityPromptModel {
       'chips': chips,
       'optional': optional,
       if (responseType != null) 'responseType': responseType,
-      if (answer != null) 'answer': answer,
+      if (answer != null) 'answer': answer!.toJson(),
     };
   }
 }
@@ -561,6 +898,24 @@ class PhaseQuizModel {
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value) ?? 0;
     return 0;
+  }
+
+  PhaseQuizModel copyWith({
+    String? id,
+    String? title,
+    bool? isCompleted,
+    bool? isPassed,
+    int? passThreshold,
+    List<PhaseQuizQuestionModel>? questions,
+  }) {
+    return PhaseQuizModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      isCompleted: isCompleted ?? this.isCompleted,
+      isPassed: isPassed ?? this.isPassed,
+      passThreshold: passThreshold ?? this.passThreshold,
+      questions: questions ?? this.questions,
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -619,6 +974,26 @@ class PhaseQuizQuestionModel {
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value) ?? 0;
     return 0;
+  }
+
+  PhaseQuizQuestionModel copyWith({
+    String? id,
+    String? type,
+    String? q,
+    List<String>? options,
+    int? answer,
+    String? explain,
+    int? userAnswer,
+  }) {
+    return PhaseQuizQuestionModel(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      q: q ?? this.q,
+      options: options ?? this.options,
+      answer: answer ?? this.answer,
+      explain: explain ?? this.explain,
+      userAnswer: userAnswer ?? this.userAnswer,
+    );
   }
 
   Map<String, dynamic> toJson() {

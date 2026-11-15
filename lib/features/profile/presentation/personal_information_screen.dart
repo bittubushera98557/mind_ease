@@ -817,6 +817,25 @@ class _PersonalInformationScreenState
                   ),
                 ),
               ),
+              const SizedBox(height: 20),
+
+              // Delete Account Link
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    context.push(RouteNames.deleteAccount);
+                  },
+                  child: Text(
+                    'Delete account',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 32),
             ],
           ),

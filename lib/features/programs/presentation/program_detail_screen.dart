@@ -70,7 +70,7 @@ class ProgramDetailScreen extends ConsumerWidget {
         int completedPhasesCount = 0;
         int activePhaseNumber = 1;
         bool foundActivePhase = false;
-        bool previousPhaseCompleted = true;
+        bool previousPhaseCompleted = true; // Phase 1 is unlocked initially
 
         final phases = detail.phases;
         final phaseProgressList = <_PhaseProgressStats>[];
@@ -89,12 +89,14 @@ class ProgramDetailScreen extends ConsumerWidget {
           final phaseDone = lessonsDone + videosDone + activityDone + quizDone;
           final phaseTotal = lessonsTotal + videosTotal + activityTotal + quizTotal;
 
-          final isUnlocked = i == 0 ||
-              phase.unlockRequirements?.previousPhaseCompleted == true ||
-              previousPhaseCompleted;
+          // A phase is completed when all its items are done or phase quiz is completed
+          final isCompleted = (phaseTotal > 0 && phaseDone >= phaseTotal)/* ||
+              phase.quiz?.isCompleted == true*/;
 
-          final isCompleted = (phaseTotal > 0 && phaseDone >= phaseTotal) ||
-              phase.quiz?.isCompleted == true;
+          // Sequential Phase Unlocking:
+          // Phase 1 (i == 0) is always unlocked.
+          // Phase N (i > 0) is unlocked ONLY if Phase N-1 was completed!
+          final isUnlocked = (i == 0) || previousPhaseCompleted;
 
           previousPhaseCompleted = isCompleted;
 
@@ -128,7 +130,7 @@ class ProgramDetailScreen extends ConsumerWidget {
           backgroundColor: AppColors.background,
           body: RefreshIndicator(
             onRefresh: () async {
-              return ref.refresh(programDetailProvider(programId).future);
+              await ref.read(programDetailProvider(programId).notifier).refresh();
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(
@@ -201,24 +203,12 @@ class ProgramDetailScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 14),
 
-                        // Render phases dynamically
+                        // Render phases dynamically according to unlock status
                         if (phaseProgressList.isNotEmpty)
                           ...List.generate(phaseProgressList.length, (index) {
                             final stats = phaseProgressList[index];
 
-                            if (stats.isUnlocked) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12.0),
-                                child: _buildActivePhaseCard(
-                                  context,
-                                  stats.phase,
-                                  programId: detail.id,
-                                  itemsDone: stats.itemsDone,
-                                  itemsTotal: stats.itemsTotal,
-                                  isCompleted: stats.isCompleted,
-                                ),
-                              );
-                            } else {
+                            if (!stats.isUnlocked) {
                               final prevNumber = index > 0
                                   ? phaseProgressList[index - 1].phaseNumber
                                   : index;
@@ -231,6 +221,28 @@ class ProgramDetailScreen extends ConsumerWidget {
                                   title: stats.phase.title,
                                   unlockMessage:
                                       'Complete Phase $prevNumber to unlock Phase ${stats.phaseNumber}.',
+                                ),
+                              );
+                            } else if (stats.isCompleted) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _buildCompletedPhaseCard(
+                                  context,
+                                  stats.phase,
+                                  programId: detail.id,
+                                  itemsDone: stats.itemsDone,
+                                  itemsTotal: stats.itemsTotal,
+                                ),
+                              );
+                            } else {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _buildActivePhaseCard(
+                                  context,
+                                  stats.phase,
+                                  programId: detail.id,
+                                  itemsDone: stats.itemsDone,
+                                  itemsTotal: stats.itemsTotal,
                                 ),
                               );
                             }
@@ -290,6 +302,9 @@ class ProgramDetailScreen extends ConsumerWidget {
   }
 
   int _calculateDefaultPoints(ProgramDetailResponseModel detail) {
+    if (detail.userPoints != null && detail.userPoints! > 0) {
+      return detail.userPoints!;
+    }
     int totalPts = 0;
     for (var phase in detail.phases) {
       if (phase.pointsAwarded != null) {
@@ -336,7 +351,7 @@ class ProgramDetailScreen extends ConsumerWidget {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  ref.invalidate(programDetailProvider(programId));
+                  ref.read(programDetailProvider(programId).notifier).loadProgramDetail();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -542,21 +557,158 @@ class ProgramDetailScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildCompletedPhaseCard(
+    BuildContext context,
+    ProgramPhaseModel phase, {
+    String? programId,
+    int itemsDone = 8,
+    int itemsTotal = 8,
+  }) {
+    final phaseNum = phase.number > 0 ? phase.number : 1;
+    final totalDisplay = itemsTotal > 0 ? itemsTotal : 8;
+
+    return GestureDetector(
+      onTap: () => context.push(
+        RouteNames.phaseDetail,
+        extra: {
+          'phase': phase,
+          'programId': programId,
+          'phaseNumber': phaseNum,
+        },
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.inputBorder),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 4,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF88A75E),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text(
+                        'PHASE $phaseNum',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDFEEDF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.check,
+                              size: 11,
+                              color: Color(0xFF4C7B3B),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Completed',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF4C7B3B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              phase.title.isNotEmpty ? phase.title : "How's Your Head, Really?",
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$itemsDone of $totalDisplay items done',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: const LinearProgressIndicator(
+                value: 1.0,
+                minHeight: 5,
+                backgroundColor: Color(0xFFE8E2DA),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Color(0xFF88A75E),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActivePhaseCard(
     BuildContext context,
     ProgramPhaseModel phase, {
     String? programId,
     int itemsDone = 0,
     int itemsTotal = 8,
-    bool isCompleted = false,
   }) {
     final phaseNum = phase.number > 0 ? phase.number : 1;
     final totalDisplay = itemsTotal > 0 ? itemsTotal : 8;
     final progressVal = (totalDisplay > 0 ? (itemsDone / totalDisplay) : 0.0).clamp(0.0, 1.0);
 
-    final statusText = isCompleted
-        ? 'Completed'
-        : (itemsDone > 0 ? 'In progress' : 'Ready to start');
+    final statusText = itemsDone > 0 ? 'In progress' : 'Ready to start';
+    final phaseColor = phase.color.isNotEmpty && phase.color.startsWith('#')
+        ? Color(int.parse('0xFF${phase.color.replaceAll('#', '')}'))
+        : const Color(0xFFED7E1C);
 
     return GestureDetector(
       onTap: () => context.push(
@@ -589,8 +741,8 @@ class ProgramDetailScreen extends ConsumerWidget {
                 Container(
                   width: 32,
                   height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF88A75E),
+                  decoration: BoxDecoration(
+                    color: phaseColor,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -626,8 +778,8 @@ class ProgramDetailScreen extends ConsumerWidget {
                           vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
-                          color: isCompleted
-                              ? const Color(0xFFDFEEDF)
+                          color: itemsDone > 0
+                              ? const Color(0xFFFEF3C7)
                               : const Color(0xFFFDF1EE),
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -636,31 +788,30 @@ class ProgramDetailScreen extends ConsumerWidget {
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
-                            color: isCompleted
-                                ? const Color(0xFF4C7B3B)
+                            color: itemsDone > 0
+                                ? const Color(0xFFD97706)
                                 : AppColors.primary,
                           ),
                         ),
                       ),
-                      if (!isCompleted)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFDF1EE),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            "You're here",
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDF1EE),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "You're here",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -668,7 +819,7 @@ class ProgramDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              phase.title.isNotEmpty ? phase.title : "How's Your Head, Really?",
+              phase.title.isNotEmpty ? phase.title : "Check Yourself, Kindly",
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -720,13 +871,18 @@ class ProgramDetailScreen extends ConsumerWidget {
     required String unlockMessage,
   }) {
     return GestureDetector(
-      onTap: () => context.push(
-        RouteNames.phaseDetail,
-        extra: {
-          if (phase != null) 'phase': phase,
-          'phaseNumber': number,
-        },
-      ),
+      onTap: () {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              unlockMessage,
+              style: GoogleFonts.plusJakartaSans(),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(

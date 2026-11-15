@@ -1,3 +1,5 @@
+import 'focus_area_resp.dart';
+
 /// Top-level response model for /therapists API endpoint
 class TherapistsListResp {
   final List<TherapistModel> therapists;
@@ -60,7 +62,7 @@ class TherapistsListResp {
 }
 
 /// Cleans focus area or specialty label if it is a raw map or key-label string
-String cleanFocusLabel(dynamic item) {
+String cleanFocusLabel(dynamic item, [List<FocusAreaResp>? focusAreas]) {
   if (item == null) return '';
   if (item is Map) {
     final label = item['label'] ?? item['name'] ?? item['title'] ?? item['key'];
@@ -71,6 +73,15 @@ String cleanFocusLabel(dynamic item) {
   }
   final str = item.toString().trim();
   if (str.isEmpty) return '';
+
+  // Look up in provided focusAreas list if available
+  if (focusAreas != null && focusAreas.isNotEmpty) {
+    for (final fa in focusAreas) {
+      if (fa.key.toLowerCase() == str.toLowerCase()) {
+        return fa.label;
+      }
+    }
+  }
 
   // Extract label if pattern match like "label: ..."
   final labelMatch =
@@ -86,6 +97,43 @@ String cleanFocusLabel(dynamic item) {
   if (keyMatch != null) {
     final extracted = keyMatch.group(1)?.trim() ?? str;
     return extracted.replaceAll('"', '').replaceAll("'", '').trim();
+  }
+
+  // Common key-to-label mappings fallback
+  switch (str.toLowerCase()) {
+    case 'stress':
+      return 'Stress';
+    case 'sleep':
+      return 'Sleep';
+    case 'anxiety':
+      return 'Anxiety';
+    case 'low_mood':
+    case 'low mood':
+      return 'Low mood';
+    case 'work_burnout':
+    case 'work and burnout':
+      return 'Work and burnout';
+    case 'relationships':
+      return 'Relationships';
+    case 'grief_loss':
+    case 'grief and loss':
+      return 'Grief and loss';
+    case 'life_changes':
+    case 'life changes':
+      return 'Life changes';
+    case 'not_sure':
+    case 'not sure yet':
+      return 'Not sure yet';
+  }
+
+  // General formatting for snake_case / kebab-case keys
+  if (str.contains('_') || str.contains('-')) {
+    final words = str.replaceAll('-', '_').split('_');
+    if (words.isNotEmpty) {
+      final capitalized = words.first[0].toUpperCase() + words.first.substring(1).toLowerCase();
+      final rest = words.skip(1).map((w) => w.toLowerCase()).join(' ');
+      return '$capitalized $rest'.trim();
+    }
   }
 
   return str;

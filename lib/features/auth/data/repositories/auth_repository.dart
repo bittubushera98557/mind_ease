@@ -214,10 +214,13 @@ class AuthRepository {
   }
 
   /// Deletes user account using DELETE /me (requires Bearer token) and clears secure storage.
-  Future<void> deleteAccount() async {
+  Future<void> deleteAccount({String? password}) async {
     try {
       await _dioClient.delete(
         ApiEndpoints.currentUser,
+        data: password != null && password.isNotEmpty
+            ? {'password': password}
+            : null,
       );
     } finally {
       await _storageService.clearAll();

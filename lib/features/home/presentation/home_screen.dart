@@ -9,6 +9,9 @@ import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import '../../dashboard/presentation/providers/points_provider.dart';
+import '../../programs/data/models/program_detail_response_model.dart';
+import '../../programs/data/models/program_response_model.dart';
+import '../../programs/presentation/providers/programs_provider.dart';
 import 'dart:developer' as developer;
 
 /// 2.01 Home Screen
@@ -19,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).user;
     final userPointsAsync = ref.watch(userPointsProvider);
+    final programsAsync = ref.watch(programsListProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -44,11 +48,76 @@ class HomeScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Continue where you left off
-                    GestureDetector(
-                      onTap: () {
-                        context.push(RouteNames.phaseDetail);
+                    programsAsync.when(
+                      data: (response) {
+                        final draftPrograms = response.programs
+                            .where((program) =>
+                                program.status.toLowerCase() == 'draft')
+                            .toList();
+
+                        if (draftPrograms.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final draftProgram = draftPrograms.first;
+                        final programDetailAsync = ref.watch(programDetailProvider(draftProgram.id));
+
+                        return programDetailAsync.when(
+                          data: (detail) {
+                            final activePhaseNumber = _getActivePhaseNumber(detail);
+                            final totalPhases = detail.phases.isNotEmpty ? detail.phases.length : 1;
+                            final activePhase = detail.phases.isEmpty
+                                ? null
+                                : detail.phases.firstWhere(
+                                    (phase) =>
+                                        (phase.number > 0 && phase.number == activePhaseNumber) ||
+                                        (phase.number == 0 &&
+                                            detail.phases.indexOf(phase) + 1 == activePhaseNumber),
+                                    orElse: () => detail.phases.first,
+                                  );
+
+                            return GestureDetector(
+                              onTap: () {
+                                context.push(
+                                  RouteNames.phaseDetail,
+                                  extra: {
+                                    'programId': draftProgram.id,
+                                    'phaseNumber': activePhaseNumber,
+                                  },
+                                );
+                              },
+                              child: _buildContinueSection(
+                                draftProgram,
+                                totalPhases,
+                                activePhaseNumber,
+                                activePhase?.title ?? draftProgram.title,
+                                activePhase?.description ?? draftProgram.short,
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, __) => GestureDetector(
+                            onTap: () {
+                              context.push(
+                                RouteNames.phaseDetail,
+                                extra: {
+                                  'programId': draftProgram.id,
+                                  'phaseNumber': 1,
+                                },
+                              );
+                            },
+                            child: _buildContinueSection(
+                              draftProgram,
+                              1,
+                              1,
+                              draftProgram.title,
+                              draftProgram.short,
+                            ),
+                          ),
+                        );
                       },
-                      child: _buildContinueSection(),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
                     ),
                     const SizedBox(height: 24),
 
@@ -292,7 +361,48 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildContinueSection() {
+  int _getActivePhaseNumber(ProgramDetailResponseModel detail) {
+    if (detail.phases.isEmpty) {
+      return 1;
+    }
+
+    bool previousPhaseCompleted = true;
+    for (int i = 0; i < detail.phases.length; i++) {
+      final phase = detail.phases[i];
+      final lessonsDone = phase.lessons.where((l) => l.isRead).length;
+      final videosDone = phase.videos.where((v) => v.isVideoWatched).length;
+      final activityDone = phase.activity?.isCompleted == true ? 1 : 0;
+      final quizDone = phase.quiz?.isCompleted == true ? 1 : 0;
+      final phaseDone = lessonsDone + videosDone + activityDone + quizDone;
+      final phaseTotal = phase.lessons.length +
+          phase.videos.length +
+          (phase.activity != null ? 1 : 0) +
+          (phase.quiz != null ? 1 : 0);
+      final isCompleted = phaseTotal > 0 && phaseDone >= phaseTotal;
+      final isUnlocked = (i == 0) || previousPhaseCompleted;
+
+      if (isUnlocked && !isCompleted) {
+        return phase.number > 0 ? phase.number : i + 1;
+      }
+
+      previousPhaseCompleted = isCompleted;
+    }
+
+    final lastPhase = detail.phases.last;
+    return lastPhase.number > 0 ? lastPhase.number : detail.phases.length;
+  }
+
+  Widget _buildContinueSection(
+    ProgramItemModel program,
+    int totalPhases,
+    int phaseNumber,
+    String phaseTitle,
+    String phaseSubtitle,
+  ) {
+    final phaseLabel = totalPhases > 0 ? 'PHASE $phaseNumber OF $totalPhases' : 'DRAFT PROGRAM';
+    final title = phaseTitle.isNotEmpty ? phaseTitle : (program.title.isNotEmpty ? program.title : 'Your current program');
+    final subtitle = phaseSubtitle.isNotEmpty ? phaseSubtitle : (program.short.isNotEmpty ? program.short : 'Continue from where you left off');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -321,17 +431,16 @@ class HomeScreen extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              // Badge circle 2
               Container(
                 width: 36,
                 height: 36,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE76F51),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE76F51),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
-                    '2',
+                    '${phaseNumber > 0 ? phaseNumber : 1}',
                     style: GoogleFonts.outfit(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -346,7 +455,7 @@ class HomeScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'PHASE 2 OF 4',
+                      phaseLabel,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -356,7 +465,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Check Yourself. Kindly',
+                      title,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -365,7 +474,7 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Upnext: Lesson: Not All Red Flags Are Loud',
+                      subtitle,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w400,

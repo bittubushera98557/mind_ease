@@ -46,6 +46,8 @@ dependencies:
   flutter_secure_storage: any
   flutter_zoom_videosdk: any
   image_picker: ^1.0.0
+  video_player: ^2.7.0
+  flutter_stripe: any
 
 dev_dependencies:
   flutter_test:

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
@@ -6,9 +8,10 @@ import 'package:video_player/video_player.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/program_detail_response_model.dart';
+import 'providers/programs_provider.dart';
 
-/// Video Detail Screen with full video playback and thumbnail support using video_player
-class VideoDetailScreen extends StatefulWidget {
+/// Video Detail Screen with full video playback, progress reporting & thumbnail support
+class VideoDetailScreen extends ConsumerStatefulWidget {
   final PhaseVideoModel? video;
   final int videoNumber;
   final int totalVideos;
@@ -18,6 +21,8 @@ class VideoDetailScreen extends StatefulWidget {
   final String? mediaUrl;
   final String? thumbnailUrl;
   final int videoCompletePercent;
+  final String? programId;
+  final String? videoId;
 
   const VideoDetailScreen({
     Key? key,
@@ -31,25 +36,93 @@ class VideoDetailScreen extends StatefulWidget {
     this.mediaUrl,
     this.thumbnailUrl,
     this.videoCompletePercent = 90,
+    this.programId,
+    this.videoId,
   }) : super(key: key);
 
   @override
-  State<VideoDetailScreen> createState() => _VideoDetailScreenState();
+  ConsumerState<VideoDetailScreen> createState() => _VideoDetailScreenState();
 }
 
-class _VideoDetailScreenState extends State<VideoDetailScreen> {
+class _VideoDetailScreenState extends ConsumerState<VideoDetailScreen> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _isPlaying = false;
   bool _isSeeking = false;
+  bool _isBuffering = false;
   bool _hasError = false;
   String _errorMessage = '';
   double _sliderValue = 0.0;
+
+  // Video Progress Tracking
+  final Set<int> _watchedSecondsSet = {};
+  int _totalVideoSeconds = 0;
+  Timer? _progressReportTimer;
+  bool _isReportingProgress = false;
 
   @override
   void initState() {
     super.initState();
     _initializeVideoPlayer();
+    _startProgressReportTimer();
+  }
+
+  void _startProgressReportTimer() {
+    _progressReportTimer?.cancel();
+    _progressReportTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (_isPlaying && mounted) {
+        _sendProgressToBackend();
+      }
+    });
+  }
+
+  Future<void> _sendProgressToBackend() async {
+    if (_isReportingProgress) return;
+
+    final programId = widget.programId?.isNotEmpty == true
+        ? widget.programId!
+        : 'mhfa';
+    final videoId = widget.videoId?.isNotEmpty == true
+        ? widget.videoId!
+        : (widget.video?.id.isNotEmpty == true ? widget.video!.id : 'p1v1');
+
+    if (programId.isEmpty || videoId.isEmpty) return;
+
+    int currentPos = 0;
+    if (_controller != null && _isInitialized) {
+      currentPos = _controller!.value.position.inSeconds;
+    } else if (_totalVideoSeconds > 0) {
+      currentPos = (_sliderValue * _totalVideoSeconds).toInt();
+    }
+
+    int totalSecs = _totalVideoSeconds > 0
+        ? _totalVideoSeconds
+        : (widget.video?.duration != null && widget.video!.duration > 0
+            ? widget.video!.duration
+            : (_controller?.value.duration.inSeconds ?? 0));
+    if (totalSecs <= 0) totalSecs = 1;
+
+    final watchedString = List.generate(
+      totalSecs,
+      (i) => _watchedSecondsSet.contains(i) ? '1' : '0',
+    ).join('');
+
+    _isReportingProgress = true;
+    try {
+      final response = await ref
+          .read(saveVideoProgressNotifierProvider.notifier)
+          .saveVideoProgress(
+            programId: programId,
+            videoId: videoId,
+            position: currentPos,
+            watched: watchedString,
+          );
+      debugPrint('Video Progress API Response: $response');
+    } catch (e) {
+      debugPrint('Error sending video progress: $e');
+    } finally {
+      _isReportingProgress = false;
+    }
   }
 
   void _initializeVideoPlayer() {
@@ -74,12 +147,20 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         }
 
         if (_controller != null) {
+          setState(() {
+            _isBuffering = true;
+          });
+
           _controller!.initialize().then((_) {
             if (mounted) {
               setState(() {
                 _isInitialized = true;
+                _isBuffering = _controller?.value.isBuffering ?? false;
                 _hasError = false;
                 _errorMessage = '';
+                if (_controller!.value.duration.inSeconds > 0) {
+                  _totalVideoSeconds = _controller!.value.duration.inSeconds;
+                }
               });
             }
           }).catchError((error) {
@@ -87,6 +168,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
             if (mounted) {
               setState(() {
                 _isInitialized = false;
+                _isBuffering = false;
                 _hasError = true;
                 _errorMessage = 'Unable to play video stream. Please check connection.';
               });
@@ -100,6 +182,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         if (mounted) {
           setState(() {
             _isInitialized = false;
+            _isBuffering = false;
             _hasError = true;
             _errorMessage = 'Failed to setup video player.';
           });
@@ -112,18 +195,43 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     if (!mounted || _controller == null) return;
 
     final value = _controller!.value;
+    final buffering = value.isBuffering;
+
+    if (value.isInitialized && value.duration.inSeconds > 0) {
+      _totalVideoSeconds = value.duration.inSeconds;
+    } else if (widget.video?.duration != null && widget.video!.duration > 0) {
+      _totalVideoSeconds = widget.video!.duration;
+    }
+
     if (!_isSeeking && value.isInitialized && value.duration.inMilliseconds > 0) {
       final progress =
           value.position.inMilliseconds / value.duration.inMilliseconds;
+
+      final currentSec = value.position.inSeconds;
+      if (value.isPlaying && currentSec >= 0) {
+        if (_totalVideoSeconds == 0 || currentSec <= _totalVideoSeconds + 2) {
+          _watchedSecondsSet.add(currentSec);
+        }
+      }
+
       setState(() {
         _sliderValue = progress.clamp(0.0, 1.0);
         _isPlaying = value.isPlaying;
+        _isBuffering = buffering;
       });
+    } else {
+      if (_isBuffering != buffering) {
+        setState(() {
+          _isBuffering = buffering;
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    _progressReportTimer?.cancel();
+    _sendProgressToBackend();
     _controller?.removeListener(_videoPlayerListener);
     _controller?.dispose();
     super.dispose();
@@ -134,6 +242,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       if (_controller!.value.isPlaying) {
         _controller!.pause();
         setState(() => _isPlaying = false);
+        _sendProgressToBackend();
       } else {
         _controller!.play();
         setState(() => _isPlaying = true);
@@ -172,6 +281,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           (ratio * _controller!.value.duration.inMilliseconds).toInt();
       _controller!.seekTo(Duration(milliseconds: targetMs));
     }
+    _sendProgressToBackend();
   }
 
   @override
@@ -216,8 +326,15 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     final playedSecs = (positionObj.inSeconds % 60).toString().padLeft(2, '0');
     final playedDurationStr = '$playedMins:$playedSecs';
 
-    final int playedPercent = (durationObj.inSeconds > 0)
-        ? ((positionObj.inSeconds / durationObj.inSeconds) * 100).toInt().clamp(0, 100)
+    final int totalSecs = durationObj.inSeconds > 0
+        ? durationObj.inSeconds
+        : (widget.video?.duration != null && widget.video!.duration > 0
+            ? widget.video!.duration
+            : 0);
+
+    final int watchedCount = _watchedSecondsSet.length;
+    final int playedPercent = (totalSecs > 0)
+        ? ((watchedCount / totalSecs) * 100).toInt().clamp(0, 100)
         : (_sliderValue * 100).toInt();
 
     return Scaffold(
@@ -234,7 +351,10 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                 children: [
                   CircularBackButton(
                     isLightOnDark: false,
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      _sendProgressToBackend();
+                      context.pop();
+                    },
                   ),
                   Expanded(
                     child: Center(
@@ -333,15 +453,6 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         ),
                       ),
 
-                      // Loading indicator if initializing
-                      if (_controller != null && !_isInitialized && !_hasError)
-                        const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
-                          ),
-                        ),
-
                       // Error message if initialization failed
                       if (_hasError)
                         Center(
@@ -396,35 +507,48 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                           ),
                         ),
 
-                      // Center Play / Pause Button
-                      Center(
-                        child: GestureDetector(
-                          onTap: _togglePlayPause,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(_isPlaying ? 0.85 : 1.0),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.25),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
+                      // Center Play / Pause / Buffering Button
+                      if (!_hasError)
+                        Center(
+                          child: GestureDetector(
+                            onTap: (_isBuffering || !_isInitialized)
+                                ? null
+                                : _togglePlayPause,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(
+                                  (_isPlaying && !_isBuffering) ? 0.85 : 1.0,
                                 ),
-                              ],
-                            ),
-                            child: Icon(
-                              _isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: AppColors.primary,
-                              size: 34,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.25),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: (_isBuffering || !_isInitialized)
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(15.0),
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.primary,
+                                        strokeWidth: 3,
+                                      ),
+                                    )
+                                  : Icon(
+                                      _isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: AppColors.primary,
+                                      size: 34,
+                                    ),
                             ),
                           ),
                         ),
-                      ),
 
                       // Video Title & Duration overlay at bottom
                       Positioned(
@@ -505,7 +629,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: _togglePlayPause,
+                    onTap: (_isBuffering || !_isInitialized)
+                        ? null
+                        : _togglePlayPause,
                     child: Container(
                       width: 44,
                       height: 44,
@@ -513,13 +639,21 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         color: AppColors.primary,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        _isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
+                      child: (_isBuffering || !_isInitialized)
+                          ? const Padding(
+                              padding: EdgeInsets.all(11.0),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : Icon(
+                              _isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -554,7 +688,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
               const SizedBox(height: 8),
 
               Text(
-                '$playedPercent% played · needs ${widget.videoCompletePercent}%',
+                '$playedPercent% watched · needs ${widget.videoCompletePercent}%',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -639,6 +773,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () {
+                    _sendProgressToBackend();
                     context.pop();
                   },
                   style: OutlinedButton.styleFrom(

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
+import '../data/models/program_detail_response_model.dart';
 import '../data/models/program_response_model.dart';
 import 'providers/programs_provider.dart';
 
@@ -65,6 +66,7 @@ class ProgramsScreen extends ConsumerWidget {
                             final program = programs[index];
                             return _buildDynamicProgramCard(
                               context,
+                              ref,
                               program,
                               isRecommended: index == 0,
                             );
@@ -149,13 +151,50 @@ class ProgramsScreen extends ConsumerWidget {
     );
   }
 
+  static int getActivePhaseNumber(ProgramDetailResponseModel detail) {
+    if (detail.phases.isEmpty) {
+      return 1;
+    }
+
+    bool previousPhaseCompleted = true;
+    for (int i = 0; i < detail.phases.length; i++) {
+      final phase = detail.phases[i];
+      final lessonsDone = phase.lessons.where((l) => l.isRead).length;
+      final videosDone = phase.videos.where((v) => v.isVideoWatched).length;
+      final activityDone = phase.activity?.isCompleted == true ? 1 : 0;
+      final quizDone = phase.quiz?.isCompleted == true ? 1 : 0;
+      final phaseDone = lessonsDone + videosDone + activityDone + quizDone;
+      final phaseTotal = phase.lessons.length +
+          phase.videos.length +
+          (phase.activity != null ? 1 : 0) +
+          (phase.quiz != null ? 1 : 0);
+      final isCompleted = phaseTotal > 0 && phaseDone >= phaseTotal;
+      final isUnlocked = (i == 0) || previousPhaseCompleted;
+
+      if (isUnlocked && !isCompleted) {
+        return phase.number > 0 ? phase.number : i + 1;
+      }
+
+      previousPhaseCompleted = isCompleted;
+    }
+
+    final lastPhase = detail.phases.last;
+    return lastPhase.number > 0 ? lastPhase.number : detail.phases.length;
+  }
+
   Widget _buildDynamicProgramCard(
     BuildContext context,
+    WidgetRef ref,
     ProgramItemModel program, {
     bool isRecommended = false,
   }) {
     final statusText =
         program.status.isNotEmpty ? program.status.toUpperCase() : 'ACTIVE';
+    final detailAsync = ref.watch(programDetailProvider(program.id));
+    final activePhaseNumber = detailAsync.maybeWhen(
+      data: (detail) => getActivePhaseNumber(detail),
+      orElse: () => 1,
+    );
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -337,7 +376,13 @@ class ProgramsScreen extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => context.push(RouteNames.phaseDetail),
+                  onPressed: () => context.push(
+                    RouteNames.phaseDetail,
+                    extra: {
+                      'programId': program.id,
+                      'phaseNumber': activePhaseNumber,
+                    },
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     elevation: 0,

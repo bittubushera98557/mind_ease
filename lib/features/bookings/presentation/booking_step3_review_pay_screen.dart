@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:developer' as developer;
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -12,6 +15,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/appointment_model.dart';
 import '../data/models/therapists_list_resp.dart';
+import '../data/repositories/bookings_repository.dart';
 import 'providers/bookings_provider.dart';
 import 'providers/therapists_provider.dart';
 
@@ -28,7 +32,8 @@ class _BookingStep3ReviewPayScreenState
     extends ConsumerState<BookingStep3ReviewPayScreen> {
   late final TextEditingController _mobileController;
   Timer? _holdTimer;
-  int _secondsRemaining = 180; // 10 minutes (600 seconds) countdown
+  int _secondsRemaining = 600; // 10 minutes (600 seconds) countdown
+  bool _isPaying = false;
 
   @override
   void initState() {
@@ -108,6 +113,413 @@ class _BookingStep3ReviewPayScreenState
     _holdTimer?.cancel();
     _mobileController.dispose();
     super.dispose();
+  }
+
+  String? _validateAustralianMobile(String? value) {
+    final trimmed = (value ?? '').trim();
+    if (trimmed.isEmpty) {
+      return 'Please enter a mobile number before paying.';
+    }
+
+    final digitsOnly = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+    if (!digitsOnly.startsWith('04')) {
+      return 'Mobile number must start with 04.';
+    }
+    if (digitsOnly.length < 10) {
+      return 'Mobile number must be at least 10 digits long.';
+    }
+
+    return null;
+  }
+
+  Future<void> _handleStripePayment({
+    required double amount,
+    required String therapistName,
+    required String therapistRole,
+    required String therapistInitials,
+    required TherapistModel? therapist,
+    required BookingFormState formState,
+  }) async {
+    final mobileError = _validateAustralianMobile(
+      _mobileController.text.isNotEmpty
+          ? _mobileController.text
+          : formState.mobileNumber,
+    );
+
+    if (mobileError != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              mobileError,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    developer.log('Opening Stripe card sheet, paymentAmount=$amount');
+    await _showCardPaymentBottomSheet(
+      amount: amount,
+      therapistName: therapistName,
+      therapistRole: therapistRole,
+      therapistInitials: therapistInitials,
+      therapist: therapist,
+      formState: formState,
+    );
+  }
+
+  Future<void> _showCardPaymentBottomSheet({
+    required double amount,
+    required String therapistName,
+    required String therapistRole,
+    required String therapistInitials,
+    required TherapistModel? therapist,
+    required BookingFormState formState,
+  }) async {
+    final cardEditController = CardFormEditController();
+    final nameController = TextEditingController();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        bool isSubmittingCard = false;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.credit_card_rounded,
+                            color: AppColors.primary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Enter Card Details',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.of(bottomSheetContext).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Cardholder Name Input
+                  Text(
+                    'Cardholder Name',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: nameController,
+                    textCapitalization: TextCapitalization.words,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Full Name on Card',
+                      hintStyle: GoogleFonts.plusJakartaSans(
+                        color: AppColors.textTertiary,
+                        fontSize: 13.5,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF7F4F0),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Stripe Prebuilt Card Form Field
+                  Text(
+                    'Card Information',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  CardFormField(
+                    controller: cardEditController,
+                    style: CardFormStyle(
+                      backgroundColor: const Color(0xFFF7F4F0),
+                      borderRadius: 12,
+                      borderColor: AppColors.inputBorder,
+                      textColor: AppColors.textPrimary,
+                      placeholderColor: AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Submit Payment Button
+                  AppButton(
+                    text: 'Pay \$${amount.toStringAsFixed(2)}',
+                    isLoading: isSubmittingCard,
+                    onPressed: isSubmittingCard
+                        ? null
+                        : () async {
+                            if (!cardEditController.details.complete) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Please enter complete card details.',
+                                    style: GoogleFonts.plusJakartaSans(),
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            setModalState(() {
+                              isSubmittingCard = true;
+                            });
+
+                            try {
+                              // Create Stripe token directly from card entry
+                            /*  final tokenData = await Stripe.instance.*//*createToken*//*createPaymentMethod(
+                                const CreateTokenParams.card(
+                                  params: CardTokenParams(),
+                                ),
+                              );*/
+
+                              final tokenData = await Stripe.instance.createPaymentMethod(
+                                params: const PaymentMethodParams.card(
+                                  paymentMethodData: PaymentMethodData(),
+                                ),
+                              );
+                              debugPrint('Stripe tokenData complete resp: ${tokenData.toString()}');
+
+                              final paymentToken = tokenData.id;
+                              debugPrint('Stripe Token Created: $paymentToken');
+
+                              if (mounted) {
+                                Navigator.of(bottomSheetContext).pop();
+                                _completeBookingWithToken(
+                                  paymentToken: paymentToken,
+                                  amount: amount,
+                                  therapistName: therapistName,
+                                  therapistRole: therapistRole,
+                                  therapistInitials: therapistInitials,
+                                  therapist: therapist,
+                                  formState: formState,
+                                );
+                              }
+                            } catch (e) {
+                              debugPrint('Error creating token: $e');
+                              setModalState(() {
+                                isSubmittingCard = false;
+                              });
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Card processing error: ${_messageFromError(e)}',
+                                      style: GoogleFonts.plusJakartaSans(),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _calculateStartsAtIso(BookingFormState formState) {
+    if (formState.selectedSlotObj != null) {
+      return formState.selectedSlotObj!.startsAt.toUtc().toIso8601String();
+    }
+    DateTime dt = formState.selectedDate;
+    if (formState.selectedTimeSlot.isNotEmpty) {
+      final timeStr = formState.selectedTimeSlot.toLowerCase();
+      final isPm = timeStr.contains('pm');
+      final clean = timeStr.replaceAll('am', '').replaceAll('pm', '').trim();
+      final parts = clean.split(':');
+      if (parts.isNotEmpty) {
+        int hour = int.tryParse(parts[0]) ?? 10;
+        final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+        if (isPm && hour < 12) hour += 12;
+        if (!isPm && hour == 12) hour = 0;
+        dt = DateTime(dt.year, dt.month, dt.day, hour, minute);
+      }
+    }
+    return dt.toUtc().toIso8601String();
+  }
+
+  Future<void> _completeBookingWithToken({
+    required String paymentToken,
+    required double amount,
+    required String therapistName,
+    required String therapistRole,
+    required String therapistInitials,
+    required TherapistModel? therapist,
+    required BookingFormState formState,
+  }) async {
+    setState(() {
+      _isPaying = true;
+    });
+
+    final therapistId = formState.selectedTherapist?.id ??
+        therapist?.id ??
+        '01a1a257-5d82-7358-ad68-810e45a5d262';
+
+    final startsAtIso = _calculateStartsAtIso(formState);
+
+    final focusList = formState.selectedFocusAreas.isNotEmpty
+        ? formState.selectedFocusAreas
+        : ['stress'];
+
+    final mobileNumber = _mobileController.text.trim().isNotEmpty
+        ? _mobileController.text.trim()
+        : (formState.mobileNumber.isNotEmpty ? formState.mobileNumber : '0412341234');
+
+    final notesText = formState.therapistNotes;
+
+    try {
+      final repository = BookingsRepository();
+      final apiResponse = await repository.createBooking(
+        therapistId: therapistId,
+        startsAt: startsAtIso,
+        focus: focusList,
+        mobile: mobileNumber,
+        notes: notesText,
+        paymentMethodId: paymentToken,
+      );
+      debugPrint('Bookings API Success: $apiResponse');
+
+      final bookingId = (apiResponse['id'] ?? apiResponse['booking']?['id'])?.toString();
+      final bookingRef = (apiResponse['bookingRef'] ?? apiResponse['ref'] ?? apiResponse['booking']?['bookingRef'])?.toString();
+
+      final newAppointment = AppointmentModel(
+        id: (bookingId != null && bookingId.isNotEmpty)
+            ? bookingId
+            : 'bk-${DateTime.now().millisecondsSinceEpoch}',
+        therapistName: therapistName,
+        therapistRole: therapistRole,
+        therapistInitials: therapistInitials,
+        dateString: _formatShortDate(formState.selectedDate),
+        dateBadge: _formatDateBadge(formState.selectedDate),
+        timeString: _formatTimeStringShort(formState),
+        duration: '${therapist?.sessionMinutes ?? 50} min video',
+        format: 'Video in MindEase',
+        status: AppointmentStatus.upcoming,
+        isNextSession: true,
+        focusAreas: formState.selectedFocusAreas,
+        totalAmount: amount,
+        bookingRef: (bookingRef != null && bookingRef.isNotEmpty)
+            ? bookingRef
+            : 'ME-BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+        therapistNotes: formState.therapistNotes,
+        paymentToken: paymentToken,
+        paymentMethod: formState.paymentMethod,
+      );
+
+      ref
+          .read(appointmentsNotifierProvider.notifier)
+          .addAppointment(newAppointment);
+
+      if (mounted) {
+        context.go(RouteNames.bookingConfirmation, extra: newAppointment);
+      }
+    } catch (e) {
+      debugPrint('Bookings API Error: $e');
+      if (mounted) {
+        final errorMessage = _messageFromError(e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errorMessage.isNotEmpty
+                  ? errorMessage
+                  : 'Failed to create booking. Please try again.',
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            backgroundColor: const Color(0xFFD9534F),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPaying = false;
+        });
+      }
+    }
+  }
+
+  String _messageFromError(Object error) {
+    if (error is ApiException) {
+      final message = error.message.trim();
+      if (message.isNotEmpty) return message;
+    }
+
+    final raw = error.toString().replaceAll('Exception: ', '').trim();
+    return raw.isNotEmpty ? raw : 'Something went wrong. Please try again.';
   }
 
   String get _formattedHoldTime {
@@ -778,36 +1190,19 @@ class _BookingStep3ReviewPayScreenState
               // Pay and Book Button
               AppButton(
                 text: payButtonText,
-                onPressed: () {
-                  // Add new appointment
-                  final newAppointment = AppointmentModel(
-                    id: 'bk-${DateTime.now().millisecondsSinceEpoch}',
-                    therapistName: therapistName,
-                    therapistRole: therapist?.specialties.isNotEmpty == true
-                        ? therapist!.specialties.map(cleanFocusLabel).where((s) => s.isNotEmpty).join(', ')
-                        : 'Clinical Psychologist',
-                    therapistInitials: therapistInitials,
-                    dateString: _formatShortDate(formState.selectedDate),
-                    dateBadge: _formatDateBadge(formState.selectedDate),
-                    timeString: _formatTimeStringShort(formState),
-                    duration: '${therapist?.sessionMinutes ?? 50} min video',
-                    format: 'Video in MindEase',
-                    status: AppointmentStatus.upcoming,
-                    isNextSession: true,
-                    focusAreas: formState.selectedFocusAreas,
-                    totalAmount: priceAmount,
-                    bookingRef:
-                        'ME-BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
-                    therapistNotes: formState.therapistNotes,
-                  );
-
-                  ref
-                      .read(appointmentsNotifierProvider.notifier)
-                      .addAppointment(newAppointment);
-
-                  context.go(RouteNames.bookingConfirmation,
-                      extra: newAppointment);
-                },
+                isLoading: _isPaying,
+                onPressed: _isPaying
+                    ? null
+                    : () {
+                        _handleStripePayment(
+                          amount: priceAmount,
+                          therapistName: therapistName,
+                          therapistRole: therapistRole,
+                          therapistInitials: therapistInitials,
+                          therapist: therapist,
+                          formState: formState,
+                        );
+                      },
               ),
               const SizedBox(height: 10),
 

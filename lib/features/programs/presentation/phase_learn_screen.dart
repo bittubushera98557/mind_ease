@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -7,9 +8,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/program_detail_response_model.dart';
+import 'providers/programs_provider.dart';
 
 /// Phase Learn Screen dynamically displaying phase lessons
-class PhaseLearnScreen extends StatelessWidget {
+class PhaseLearnScreen extends ConsumerWidget {
   final List<PhaseLessonModel>? lessons;
   final int phaseNumber;
   final String? programId;
@@ -43,9 +45,27 @@ class PhaseLearnScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final hasDynamicLessons = lessons != null && lessons!.isNotEmpty;
-    final totalLessons = hasDynamicLessons ? lessons!.length : _defaultLessons.length;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final effectiveProgramId = programId?.isNotEmpty == true ? programId! : 'mhfa';
+    final detailAsync = ref.watch(programDetailProvider(effectiveProgramId));
+
+    List<PhaseLessonModel>? activeLessons = lessons;
+    if (detailAsync.hasValue && detailAsync.value != null) {
+      final phases = detailAsync.value!.phases;
+      final targetPhase = phases.firstWhere(
+        (p) => p.number == phaseNumber,
+        orElse: () => phases.isNotEmpty ? phases[0] : const ProgramPhaseModel(),
+      );
+      if (targetPhase.lessons.isNotEmpty) {
+        activeLessons = targetPhase.lessons;
+      }
+    }
+
+    final hasDynamicLessons = activeLessons != null && activeLessons.isNotEmpty;
+    final totalLessons = hasDynamicLessons ? activeLessons.length : _defaultLessons.length;
+    final lessonsDoneCount = hasDynamicLessons
+        ? activeLessons.where((l) => l.isRead).length
+        : 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -96,7 +116,7 @@ class PhaseLearnScreen extends StatelessWidget {
 
               // Description
               Text(
-                '0 of $totalLessons lessons read. Open a lesson and mark it complete at the end.',
+                '$lessonsDoneCount of $totalLessons lessons read. Open a lesson and mark it complete at the end.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w400,
@@ -108,15 +128,15 @@ class PhaseLearnScreen extends StatelessWidget {
 
               // Lesson Cards
               if (hasDynamicLessons)
-                ...List.generate(lessons!.length, (index) {
-                  final lesson = lessons![index];
+                ...List.generate(activeLessons.length, (index) {
+                  final lesson = activeLessons![index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _buildDynamicLessonCard(
                       context,
                       lesson,
                       index + 1,
-                      lessons!.length,
+                      activeLessons.length,
                     ),
                   );
                 })

@@ -390,6 +390,7 @@ class DioClient {
 
   Future<ApiResponse<T>> delete<T>(
     String path, {
+    Object? data,
     Map<String, dynamic>? queryParameters,
     Options? options,
     T Function(dynamic json)? fromJson,
@@ -397,6 +398,7 @@ class DioClient {
     try {
       final response = await dio.delete(
         path,
+        data: data,
         queryParameters: queryParameters,
         options: options,
       );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,9 +7,10 @@ import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/program_detail_response_model.dart';
+import 'providers/programs_provider.dart';
 
 /// Phase Detail Screen dynamically rendering phase data from GET /programs/{programId}
-class PhaseDetailScreen extends StatelessWidget {
+class PhaseDetailScreen extends ConsumerWidget {
   final ProgramPhaseModel? phase;
   final int phaseNumber;
   final String phaseTitle;
@@ -23,22 +25,36 @@ class PhaseDetailScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final effectiveNumber = phase?.number != null && phase!.number > 0
-        ? phase!.number
+  Widget build(BuildContext context, WidgetRef ref) {
+    final effectiveProgramId = programId?.isNotEmpty == true ? programId! : 'mhfa';
+    final detailAsync = ref.watch(programDetailProvider(effectiveProgramId));
+
+    ProgramPhaseModel? activePhase = phase;
+    if (detailAsync.hasValue && detailAsync.value != null) {
+      final phases = detailAsync.value!.phases;
+      activePhase = phases.firstWhere(
+        (p) =>
+            (phase != null && p.id.isNotEmpty && p.id == phase!.id) ||
+            (p.number > 0 && p.number == (phase?.number ?? phaseNumber)),
+        orElse: () => phase ?? (phases.isNotEmpty ? phases[0] : const ProgramPhaseModel()),
+      );
+    }
+
+    final effectiveNumber = activePhase != null && activePhase.number > 0
+        ? activePhase.number
         : phaseNumber;
-    final effectiveTitle = phase?.title.isNotEmpty == true
-        ? phase!.title
+    final effectiveTitle = activePhase?.title.isNotEmpty == true
+        ? activePhase!.title
         : phaseTitle;
 
-    final description = phase?.description.isNotEmpty == true
-        ? phase!.description
+    final description = activePhase?.description.isNotEmpty == true
+        ? activePhase!.description
         : 'Learn what mental health really means and how it shows up in your body, thoughts, and habits. Start noticing what supports your wellbeing and what makes things harder.';
 
-    final lessons = phase?.lessons ?? [];
-    final videos = phase?.videos ?? [];
-    final activity = phase?.activity;
-    final quiz = phase?.quiz;
+    final lessons = activePhase?.lessons ?? [];
+    final videos = activePhase?.videos ?? [];
+    final activity = activePhase?.activity;
+    final quiz = activePhase?.quiz;
 
     // Dynamic item counts
     final lessonsCount = lessons.isNotEmpty ? lessons.length : 3;
@@ -63,20 +79,20 @@ class PhaseDetailScreen extends StatelessWidget {
     final double progressRatio = totalItems > 0 ? (totalDoneItems / totalItems) : 0.0;
     final int progressPercentage = (progressRatio * 100).toInt();
 
-    final bool isPhaseCompleted = (totalDoneItems >= totalItems && totalItems > 0) || isQuizPassed;
+    final bool isPhaseCompleted = (totalDoneItems >= totalItems && totalItems > 0) /*|| isQuizPassed*/;
     final String statusText = isPhaseCompleted
         ? 'Completed'
         : (totalDoneItems > 0 ? 'In progress' : 'Ready to start');
 
-    final objectives = phase?.objectives.isNotEmpty == true
-        ? phase!.objectives
+    final objectives = activePhase?.objectives.isNotEmpty == true
+        ? activePhase!.objectives
         : const [
             'Describe mental health as part of whole-person health',
             'Place yourself on the mental health continuum',
             'Name things that support and strain your wellbeing',
           ];
 
-    final points = phase?.pointsAwarded ?? 100;
+    final points = activePhase?.pointsAwarded ?? 100;
 
     final activityProgressStr = isActivityCompleted
         ? 'Completed'
@@ -126,7 +142,7 @@ class PhaseDetailScreen extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // Up Next Card
-                  _buildUpNextCard(context, lessons, programId: programId),
+                  _buildUpNextCard(context, lessons, programId: effectiveProgramId),
                   const SizedBox(height: 16),
 
                   // 2x2 Grid of Content Items (Learn, Watch, Activity, Quiz)
@@ -146,7 +162,7 @@ class PhaseDetailScreen extends StatelessWidget {
                             extra: {
                               'lessons': lessons,
                               'phaseNumber': effectiveNumber,
-                              'programId': programId,
+                              'programId': effectiveProgramId,
                             },
                           ),
                         ),
@@ -166,6 +182,7 @@ class PhaseDetailScreen extends StatelessWidget {
                             extra: {
                               'videos': videos,
                               'phaseNumber': effectiveNumber,
+                              'programId': effectiveProgramId,
                             },
                           ),
                         ),
@@ -189,6 +206,8 @@ class PhaseDetailScreen extends StatelessWidget {
                             extra: {
                               'activity': activity,
                               'phaseNumber': effectiveNumber,
+                              'programId': effectiveProgramId,
+                              'phaseId': activePhase?.id,
                             },
                           ),
                         ),
@@ -208,8 +227,8 @@ class PhaseDetailScreen extends StatelessWidget {
                             extra: {
                               'quiz': quiz,
                               'phaseNumber': effectiveNumber,
-                              'programId': programId,
-                              'phaseId': phase?.id,
+                              'programId': effectiveProgramId,
+                              'phaseId': activePhase?.id,
                             },
                           ),
                         ),

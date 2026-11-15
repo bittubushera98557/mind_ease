@@ -13,6 +13,7 @@ import 'providers/programs_provider.dart';
 enum _QuizScreenMode { intro, question, results }
 
 class _QuizQuestionData {
+  final String id;
   final int number;
   final String question;
   final List<String> options;
@@ -21,6 +22,7 @@ class _QuizQuestionData {
   final String feedbackIncorrect;
 
   const _QuizQuestionData({
+    required this.id,
     required this.number,
     required this.question,
     required this.options,
@@ -56,9 +58,11 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
   bool _isSubmitted = false;
   int _score = 0;
   int _attemptsCount = 0;
+  final Map<String, int> _heldAnswers = {};
 
   static const List<_QuizQuestionData> _defaultQuestionsBank = [
     _QuizQuestionData(
+      id: 'p1q-1',
       number: 1,
       question: 'Which statement best describes mental health?',
       options: [
@@ -74,6 +78,7 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
           'Everyone has mental health. It covers thoughts, feelings and behaviour, and it shows up in the body and in habits.',
     ),
     _QuizQuestionData(
+      id: 'p1q-2',
       number: 2,
       question: 'Where can you usually notice mental health shifts first?',
       options: [
@@ -89,6 +94,7 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
           'Mental health shifts show up first in physical sensations, thought patterns, and everyday routines.',
     ),
     _QuizQuestionData(
+      id: 'p1q-3',
       number: 3,
       question: 'Which is most worth paying attention to?',
       options: [
@@ -104,6 +110,7 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
           'Persistent changes that impact day-to-day living are the key signs to notice.',
     ),
     _QuizQuestionData(
+      id: 'p1q-4',
       number: 4,
       question: 'Is mental health the same as mental illness?',
       options: [
@@ -119,6 +126,7 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
           'Mental health belongs to everyone and changes over time, unlike a diagnosed clinical condition.',
     ),
     _QuizQuestionData(
+      id: 'p1q-5',
       number: 5,
       question: 'What is a great first step if you need support?',
       options: [
@@ -140,7 +148,11 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
       return activeQuiz.questions.asMap().entries.map((entry) {
         final idx = entry.key;
         final q = entry.value;
+        final qId = q.id.isNotEmpty
+            ? q.id
+            : 'p${widget.phaseNumber}q-${idx + 1}';
         return _QuizQuestionData(
+          id: qId,
           number: idx + 1,
           question: q.q,
           options: q.options,
@@ -154,7 +166,22 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
         );
       }).toList();
     }
-    return _defaultQuestionsBank;
+    return _defaultQuestionsBank.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final qData = entry.value;
+      final qId = qData.id.isNotEmpty
+          ? qData.id
+          : 'p${widget.phaseNumber}q-${idx + 1}';
+      return _QuizQuestionData(
+        id: qId,
+        number: qData.number,
+        question: qData.question,
+        options: qData.options,
+        correctIndex: qData.correctIndex,
+        feedbackCorrect: qData.feedbackCorrect,
+        feedbackIncorrect: qData.feedbackIncorrect,
+      );
+    }).toList();
   }
 
   ProgramPhaseModel? _findPhase(List<ProgramPhaseModel> phases) {
@@ -180,6 +207,7 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
       _selectedOptionIndex = null;
       _isSubmitted = false;
       _score = 0;
+      _heldAnswers.clear();
     });
   }
 
@@ -191,13 +219,14 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
 
     setState(() {
       _isSubmitted = true;
+      _heldAnswers[q.id] = _selectedOptionIndex!;
       if (isCorrect) {
         _score++;
       }
     });
   }
 
-  void _nextQuestion(int totalQuestions) {
+  void _nextQuestion(int totalQuestions, [int passThreshold = 80]) {
     if (_currentQuestionIndex < totalQuestions - 1) {
       setState(() {
         _currentQuestionIndex++;
@@ -209,7 +238,22 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
         _attemptsCount++;
         _mode = _QuizScreenMode.results;
       });
+      _submitQuizResults(totalQuestions, passThreshold);
     }
+  }
+
+  void _submitQuizResults(int totalQuestions, int passThreshold) {
+    final programId = widget.programId?.isNotEmpty == true ? widget.programId! : 'mhfa';
+    final quizId = widget.quiz?.id.isNotEmpty == true ? widget.quiz!.id : 'p${widget.phaseNumber}q';
+
+    ref.read(submitQuizNotifierProvider.notifier).submitQuiz(
+          programId: programId,
+          quizId: quizId,
+          answers: Map<String, int>.from(_heldAnswers),
+        ).catchError((err) {
+          debugPrint('Submit quiz API exception: $err');
+          return null;
+        });
   }
 
   void _retryQuiz() {
@@ -363,7 +407,7 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
       case _QuizScreenMode.intro:
         return _buildIntroScreen(questions, passThreshold);
       case _QuizScreenMode.question:
-        return _buildQuestionScreen(questions);
+        return _buildQuestionScreen(questions, passThreshold);
       case _QuizScreenMode.results:
         return _buildResultsScreen(questions, passThreshold);
     }
@@ -493,7 +537,10 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
   // ═══════════════════════════════════════════════════════════════════════════
   // 2. ACTIVE QUESTION SCREEN
   // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildQuestionScreen(List<_QuizQuestionData> questionsList) {
+  Widget _buildQuestionScreen(
+    List<_QuizQuestionData> questionsList, [
+    int passThreshold = 80,
+  ]) {
     final q = questionsList[_currentQuestionIndex];
     final total = questionsList.length;
     final progressVal = (_currentQuestionIndex + 1) / total;
@@ -619,7 +666,7 @@ class _PhaseQuizScreenState extends ConsumerState<PhaseQuizScreen> {
           child: _isSubmitted
               ? AppButton(
                   text: 'Next question \u2192',
-                  onPressed: () => _nextQuestion(total),
+                  onPressed: () => _nextQuestion(total, passThreshold),
                 )
               : AppButton(
                   text: 'Submit answer',
