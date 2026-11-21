@@ -47,6 +47,8 @@ class ApiEndpoints {
   static const String telehealthToken = '/telehealth/token';
 }
 
+//https://mindease.me/privacy-policy/
+// https://mindease.me/terms-and-conditions/
 
 /*
  static const String deleteMyPhoto = '/me/photo'; // it will be hit with bearer token

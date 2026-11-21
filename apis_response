@@ -1285,3 +1285,18 @@ i need clarity on quiz, type of quiz
 in https://api.mindease.me/v1/me/programs/{programId}/progress  there will be only p1,p2,p3,p4 phases or more or less?
 
 in profile - i getting image url but url showing 404 not found
+
+
+
+
+
+-------------------------
+
+storePassword=mind_ease
+keyPassword=mind_ease
+keyAlias=mind_ease
+
+
+stripe
+   pk_test_51R6Ud7Jkj5lOrYw1aaYaU5l73oXXiDQ1agqIKS3G6dIM0G2ulpKygXUybVNtFcpsk5mseGMiZC6Hi8Aq2OSjhNXd009LeAamkW
+  sk_test_51R6Ud7Jkj5lOrYw18aYVzF173wrxxd9z4Q9XtGEyCyMZ94aL9FHcYv8gjNLwcUGAkXRgQaX8EsUHUBceGQCVJxF200hLh9o4hW

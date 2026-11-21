@@ -34,7 +34,8 @@ class EnvConfig {
     bool? enableLogging,
     String? stripePublishableKey,
   }) {
-    const defaultStripeKey = 'pk_test_51P2poYFOjqYjuziSQehIuAQksSaw3hKCtNnK5r7mrLs5xwS6ULXbNQJCDmPwdUISPMzqvxdMvzl5g2sHZHpDk4zq00YjLu4h6C'; // Test Stripe Publishable Key
+    const defaultStripeKey = 'pk_test_51R6Ud7Jkj5lOrYw1aaYaU5l73oXXiDQ1agqIKS3G6dIM0G2ulpKygXUybVNtFcpsk5mseGMiZC6Hi8Aq2OSjhNXd009LeAamkW'; // Test Stripe Publishable Key
+    // const defaultStripeKey = 'pk_test_51P2poYFOjqYjuziSQehIuAQksSaw3hKCtNnK5r7mrLs5xwS6ULXbNQJCDmPwdUISPMzqvxdMvzl5g2sHZHpDk4zq00YjLu4h6C'; // Test Stripe Publishable Key
     // const defaultStripeKey = 'pk_test_51Mz2xSGB582kSKxQ32847923847923849'; // Test Stripe Publishable Key
 
     switch (environment) {
