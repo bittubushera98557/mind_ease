@@ -32,7 +32,7 @@ class _BookingStep3ReviewPayScreenState
     extends ConsumerState<BookingStep3ReviewPayScreen> {
   late final TextEditingController _mobileController;
   Timer? _holdTimer;
-  int _secondsRemaining = 600; // 10 minutes (600 seconds) countdown
+  int _secondsRemaining = 1200; // 20 minutes (600 seconds) countdown
   bool _isPaying = false;
 
   @override
@@ -186,7 +186,6 @@ class _BookingStep3ReviewPayScreenState
     required TherapistModel? therapist,
     required BookingFormState formState,
   }) async {
-    final cardEditController = CardFormEditController();
     final nameController = TextEditingController();
 
     await showModalBottomSheet(
@@ -199,6 +198,9 @@ class _BookingStep3ReviewPayScreenState
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
               padding: EdgeInsets.only(
                 left: 20,
                 right: 20,
@@ -209,173 +211,178 @@ class _BookingStep3ReviewPayScreenState
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.credit_card_rounded,
-                            color: AppColors.primary,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Enter Card Details',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.credit_card_rounded,
+                              color: AppColors.primary,
+                              size: 24,
                             ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Enter Card Details',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.of(bottomSheetContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Cardholder Name Input
+                    Text(
+                      'Cardholder Name',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: nameController,
+                      textCapitalization: TextCapitalization.words,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Full Name on Card',
+                        hintStyle: GoogleFonts.plusJakartaSans(
+                          color: AppColors.textTertiary,
+                          fontSize: 13.5,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF7F4F0),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Stripe CardField Input
+                    Text(
+                      'Card Information',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    CardField(
+                      autofocus: false,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintStyle: GoogleFonts.plusJakartaSans(
+                          color: AppColors.textTertiary,
+                          fontSize: 13.5,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF7F4F0),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.inputBorder,
                           ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.of(bottomSheetContext).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Cardholder Name Input
-                  Text(
-                    'Cardholder Name',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: nameController,
-                    textCapitalization: TextCapitalization.words,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Full Name on Card',
-                      hintStyle: GoogleFonts.plusJakartaSans(
-                        color: AppColors.textTertiary,
-                        fontSize: 13.5,
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFF7F4F0),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 24),
 
-                  // Stripe Prebuilt Card Form Field
-                  Text(
-                    'Card Information',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  CardFormField(
-                    controller: cardEditController,
-                    style: CardFormStyle(
-                      backgroundColor: const Color(0xFFF7F4F0),
-                      borderRadius: 12,
-                      borderColor: AppColors.inputBorder,
-                      textColor: AppColors.textPrimary,
-                      placeholderColor: AppColors.textTertiary,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Submit Payment Button
-                  AppButton(
-                    text: 'Pay \$${amount.toStringAsFixed(2)}',
-                    isLoading: isSubmittingCard,
-                    onPressed: isSubmittingCard
-                        ? null
-                        : () async {
-                            if (!cardEditController.details.complete) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Please enter complete card details.',
-                                    style: GoogleFonts.plusJakartaSans(),
-                                  ),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            setModalState(() {
-                              isSubmittingCard = true;
-                            });
-
-                            try {
-                              // Create Stripe token directly from card entry
-                            /*  final tokenData = await Stripe.instance.*//*createToken*//*createPaymentMethod(
-                                const CreateTokenParams.card(
-                                  params: CardTokenParams(),
-                                ),
-                              );*/
-
-                              final tokenData = await Stripe.instance.createPaymentMethod(
-                                params: const PaymentMethodParams.card(
-                                  paymentMethodData: PaymentMethodData(),
-                                ),
-                              );
-                              debugPrint('Stripe tokenData complete resp: ${tokenData.toString()}');
-
-                              final paymentToken = tokenData.id;
-                              debugPrint('Stripe Token Created: $paymentToken');
-
-                              if (mounted) {
-                                Navigator.of(bottomSheetContext).pop();
-                                _completeBookingWithToken(
-                                  paymentToken: paymentToken,
-                                  amount: amount,
-                                  therapistName: therapistName,
-                                  therapistRole: therapistRole,
-                                  therapistInitials: therapistInitials,
-                                  therapist: therapist,
-                                  formState: formState,
-                                );
-                              }
-                            } catch (e) {
-                              debugPrint('Error creating token: $e');
+                    // Submit Payment Button
+                    AppButton(
+                      text: 'Pay \$${amount.toStringAsFixed(2)}',
+                      isLoading: isSubmittingCard,
+                      onPressed: isSubmittingCard
+                          ? null
+                          : () async {
                               setModalState(() {
-                                isSubmittingCard = false;
+                                isSubmittingCard = true;
                               });
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Card processing error: ${_messageFromError(e)}',
-                                      style: GoogleFonts.plusJakartaSans(),
+
+                              try {
+                                debugPrint('Requesting Stripe PaymentMethod from CardField...');
+                                final tokenData = await Stripe.instance.createPaymentMethod(
+                                  params: PaymentMethodParams.card(
+                                    paymentMethodData: PaymentMethodData(
+                                      billingDetails: BillingDetails(
+                                        name: nameController.text.trim().isNotEmpty
+                                            ? nameController.text.trim()
+                                            : null,
+                                      ),
                                     ),
-                                    backgroundColor: Colors.red,
                                   ),
                                 );
+                                debugPrint('Stripe tokenData complete resp: ${tokenData.toString()}');
+
+                                final paymentToken = tokenData.id;
+                                debugPrint('Stripe Token Created: $paymentToken');
+
+                                if (mounted) {
+                                  Navigator.of(bottomSheetContext).pop();
+                                  _completeBookingWithToken(
+                                    paymentToken: paymentToken,
+                                    amount: amount,
+                                    therapistName: therapistName,
+                                    therapistRole: therapistRole,
+                                    therapistInitials: therapistInitials,
+                                    therapist: therapist,
+                                    formState: formState,
+                                  );
+                                }
+                              } catch (e) {
+                                debugPrint('Error creating Stripe payment method: $e');
+                                setModalState(() {
+                                  isSubmittingCard = false;
+                                });
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Card error: ${_messageFromError(e)}',
+                                        style: GoogleFonts.plusJakartaSans(),
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               }
-                            }
-                          },
-                  ),
-                ],
+                            },
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -513,6 +520,9 @@ class _BookingStep3ReviewPayScreenState
   }
 
   String _messageFromError(Object error) {
+    if (error is StripeException) {
+      return error.error.localizedMessage ?? error.error.message ?? 'Stripe card error';
+    }
     if (error is ApiException) {
       final message = error.message.trim();
       if (message.isNotEmpty) return message;

@@ -77,6 +77,9 @@ class BookingItemModel {
   final String? joinOpensAt;
   final String? createdAt;
 
+  final String? meetingJwtToken;
+
+
   const BookingItemModel({
     this.id = '',
     this.status = '',
@@ -93,6 +96,7 @@ class BookingItemModel {
     this.refundIfCancelledCents = 0,
     this.joinOpensAt,
     this.createdAt,
+    this.meetingJwtToken,
   });
 
   factory BookingItemModel.fromJson(Map<String, dynamic> json) {
@@ -118,6 +122,7 @@ class BookingItemModel {
       refundIfCancelledCents: _parseInt(json['refundIfCancelledCents']),
       joinOpensAt: json['joinOpensAt']?.toString(),
       createdAt: json['createdAt']?.toString(),
+      meetingJwtToken: json['meetingJwtToken']?.toString(),
     );
   }
 
@@ -144,7 +149,47 @@ class BookingItemModel {
       'refundIfCancelledCents': refundIfCancelledCents,
       if (joinOpensAt != null) 'joinOpensAt': joinOpensAt,
       if (createdAt != null) 'createdAt': createdAt,
+      if (meetingJwtToken != null) 'meetingJwtToken': meetingJwtToken,
     };
+  }
+
+  BookingItemModel copyWith({
+    String? id,
+    String? status,
+    String? cancelReason,
+    String? startsAt,
+    String? endsAt,
+    String? holdExpiresAt,
+    BookingTherapistModel? therapist,
+    int? priceCents,
+    String? currency,
+    String? notes,
+    BookingPaymentModel? payment,
+    bool? canCancel,
+    int? refundIfCancelledCents,
+    String? joinOpensAt,
+    String? createdAt,
+    String? meetingJwtToken,
+  }) {
+    return BookingItemModel(
+      id: id ?? this.id,
+      status: status ?? this.status,
+      cancelReason: cancelReason ?? this.cancelReason,
+      startsAt: startsAt ?? this.startsAt,
+      endsAt: endsAt ?? this.endsAt,
+      holdExpiresAt: holdExpiresAt ?? this.holdExpiresAt,
+      therapist: therapist ?? this.therapist,
+      priceCents: priceCents ?? this.priceCents,
+      currency: currency ?? this.currency,
+      notes: notes ?? this.notes,
+      payment: payment ?? this.payment,
+      canCancel: canCancel ?? this.canCancel,
+      refundIfCancelledCents:
+          refundIfCancelledCents ?? this.refundIfCancelledCents,
+      joinOpensAt: joinOpensAt ?? this.joinOpensAt,
+      createdAt: createdAt ?? this.createdAt,
+      meetingJwtToken: meetingJwtToken ?? this.meetingJwtToken,
+    );
   }
 }
 

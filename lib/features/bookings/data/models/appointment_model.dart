@@ -26,6 +26,7 @@ class AppointmentModel {
   final String? therapistNotes;
   final String? paymentToken;
   final String? paymentMethod;
+  final String? meetingJwtToken;
 
   const AppointmentModel({
     required this.id,
@@ -45,7 +46,50 @@ class AppointmentModel {
     this.therapistNotes,
     this.paymentToken,
     this.paymentMethod,
+    this.meetingJwtToken,
   });
+
+  AppointmentModel copyWith({
+    String? id,
+    String? therapistName,
+    String? therapistRole,
+    String? therapistInitials,
+    String? dateString,
+    String? dateBadge,
+    String? timeString,
+    String? duration,
+    String? format,
+    AppointmentStatus? status,
+    bool? isNextSession,
+    List<String>? focusAreas,
+    double? totalAmount,
+    String? bookingRef,
+    String? therapistNotes,
+    String? paymentToken,
+    String? paymentMethod,
+    String? meetingJwtToken,
+  }) {
+    return AppointmentModel(
+      id: id ?? this.id,
+      therapistName: therapistName ?? this.therapistName,
+      therapistRole: therapistRole ?? this.therapistRole,
+      therapistInitials: therapistInitials ?? this.therapistInitials,
+      dateString: dateString ?? this.dateString,
+      dateBadge: dateBadge ?? this.dateBadge,
+      timeString: timeString ?? this.timeString,
+      duration: duration ?? this.duration,
+      format: format ?? this.format,
+      status: status ?? this.status,
+      isNextSession: isNextSession ?? this.isNextSession,
+      focusAreas: focusAreas ?? this.focusAreas,
+      totalAmount: totalAmount ?? this.totalAmount,
+      bookingRef: bookingRef ?? this.bookingRef,
+      therapistNotes: therapistNotes ?? this.therapistNotes,
+      paymentToken: paymentToken ?? this.paymentToken,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      meetingJwtToken: meetingJwtToken ?? this.meetingJwtToken,
+    );
+  }
 }
 
 /// State model tracking booking flow form state

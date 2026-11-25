@@ -39,7 +39,7 @@ class ZoomVideoSdkService {
     try {
       final response = await _apiClient.post(
         ApiEndpoints.telehealthToken,
-        data: {
+        body: {
           'bookingId': bookingId,
           'role': userRole,
         },
@@ -55,6 +55,50 @@ class ZoomVideoSdkService {
     return 'mock.jwt.telehealth.token.$bookingId';
   }
 
+  /// Dynamically joins a Zoom Video SDK session using the meeting JWT token from booking response.
+  /// If [jwtToken] is null or empty, it dynamically fetches a short-lived token from backend.
+  Future<bool> joinSessionWithJwtToken({
+    required String sessionName, // bookingId or bookingRef
+    String? jwtToken, // meetingJwtToken from BookingItemModel / AppointmentModel
+    required String userName,
+    String? bookingId,
+    String userRole = 'client',
+    bool enableRecording = false, // Recording OFF by default
+  }) async {
+    try {
+      String? token = jwtToken;
+
+      // Dynamically fetch token from backend if not provided in booking response
+      if (token == null || token.isEmpty) {
+        debugPrint(
+            'meetingJwtToken is null/empty in booking model. Requesting token from backend API...');
+        token = await fetchShortLivedJwtToken(
+          bookingId: bookingId ?? sessionName,
+          userRole: userRole,
+        );
+      }
+
+      if (token == null || token.isEmpty) {
+        debugPrint('Zoom Video SDK Error: Unable to obtain JWT Token for session $sessionName');
+        return false;
+      }
+
+      debugPrint(
+        'Successfully bound meetingJwtToken for Zoom session $sessionName (token: ${token.substring(0, token.length > 12 ? 12 : token.length)}...)',
+      );
+
+      return await initializeSession(
+        sessionName: sessionName,
+        jwtToken: token,
+        userName: userName,
+        enableRecording: enableRecording,
+      );
+    } catch (e) {
+      debugPrint('Zoom Video SDK dynamic join failed: $e');
+      return false;
+    }
+  }
+
   /// Initializes Zoom Video SDK Session with Recording OFF
   Future<bool> initializeSession({
     required String sessionName, // bookingId
@@ -64,7 +108,7 @@ class ZoomVideoSdkService {
   }) async {
     try {
       debugPrint(
-          'Initializing Zoom Video SDK sessionName=$sessionName, recordingEnabled=$enableRecording');
+          'Initializing Zoom Video SDK sessionName=$sessionName, jwtToken=${jwtToken.substring(0, jwtToken.length > 10 ? 10 : jwtToken.length)}..., recordingEnabled=$enableRecording');
       // Note: flutter_zoom_videosdk parameters initialized here:
       // InitConfig(domain: "zoom.us", enableLog: false)
       // JoinSession(sessionName: sessionName, token: jwtToken, userName: userName)

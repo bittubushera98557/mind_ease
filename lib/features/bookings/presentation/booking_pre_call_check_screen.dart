@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/router/route_names.dart';
+import '../../../core/services/zoom_video_sdk_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
@@ -10,7 +12,7 @@ import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/appointment_model.dart';
 
 /// 5.09 Pre-call Hardware & Connection Check Screen
-class BookingPreCallCheckScreen extends StatefulWidget {
+class BookingPreCallCheckScreen extends ConsumerStatefulWidget {
   final AppointmentModel? appointment;
 
   const BookingPreCallCheckScreen({
@@ -19,13 +21,36 @@ class BookingPreCallCheckScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<BookingPreCallCheckScreen> createState() =>
+  ConsumerState<BookingPreCallCheckScreen> createState() =>
       _BookingPreCallCheckScreenState();
 }
 
-class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
+class _BookingPreCallCheckScreenState
+    extends ConsumerState<BookingPreCallCheckScreen> {
   bool _isMicMuted = false;
   bool _isCameraOff = false;
+  bool _isJoining = false;
+
+  Future<void> _handleJoinSession(AppointmentModel appt) async {
+    setState(() {
+      _isJoining = true;
+    });
+
+    final zoomService = ref.read(zoomVideoSdkServiceProvider);
+    await zoomService.joinSessionWithJwtToken(
+      sessionName: appt.id,
+      jwtToken: appt.meetingJwtToken,
+      bookingId: appt.id,
+      userName: 'Client',
+    );
+
+    if (mounted) {
+      setState(() {
+        _isJoining = false;
+      });
+      context.push(RouteNames.bookingInSession, extra: appt);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -271,10 +296,9 @@ class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
 
               // Join Session Button
               AppButton(
-                text: 'Join session',
-                onPressed: () {
-                  context.push(RouteNames.bookingInSession, extra: appt);
-                },
+                text: _isJoining ? 'Joining session...' : 'Join session',
+                isLoading: _isJoining,
+                onPressed: _isJoining ? null : () => _handleJoinSession(appt),
               ),
               const SizedBox(height: 8),
 

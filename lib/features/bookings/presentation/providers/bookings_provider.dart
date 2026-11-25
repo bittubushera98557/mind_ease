@@ -147,6 +147,7 @@ AppointmentModel bookingItemToAppointment(BookingItemModel item, {bool isNext = 
         ? 'ME-BK-${item.id.substring(0, item.id.length > 6 ? 6 : item.id.length).toUpperCase()}'
         : 'ME-BK-020125',
     therapistNotes: item.notes,
+    meetingJwtToken: item.meetingJwtToken,
   );
 }
 

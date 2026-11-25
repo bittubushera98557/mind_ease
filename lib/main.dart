@@ -36,3 +36,13 @@ void main() async {
     ),
   );
 }
+
+
+
+///Volumes/Untitled/SDKs/flutter_3.38.1/bin/cache/dart-sdk
+///dart 3.10.0       // flutter_3.38.1
+///rs@rss-Mac-mini ~ % java -version
+// openjdk version "17.0.8" 2023-07-18
+// OpenJDK Runtime Environment Temurin-17.0.8+7 (build 17.0.8+7)
+// OpenJDK 64-Bit Server VM Temurin-17.0.8+7 (build 17.0.8+7, mixed mode, sharing)
+// rs@rss-Mac-mini ~ %
