@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
 import '../data/models/appointment_model.dart';
+import 'providers/bookings_provider.dart';
 import 'widgets/cancel_session_bottom_sheet.dart';
 
 /// 5.07 Appointment Detail / Pre-Session Screen
-class BookingPreSessionScreen extends StatelessWidget {
+class BookingPreSessionScreen extends ConsumerStatefulWidget {
   final AppointmentModel? appointment;
 
   const BookingPreSessionScreen({
@@ -20,8 +23,67 @@ class BookingPreSessionScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  ConsumerState<BookingPreSessionScreen> createState() =>
+      _BookingPreSessionScreenState();
+}
+
+class _BookingPreSessionScreenState
+    extends ConsumerState<BookingPreSessionScreen> {
+  bool _isGeneratingToken = false;
+
+  Future<void> _handleJoinSession(AppointmentModel appt) async {
+    setState(() {
+      _isGeneratingToken = true;
+    });
+
+    try {
+      final bookingId = appt.id;
+      final tokenResp = await ref
+          .read(bookingsRepositoryProvider)
+          .fetchZoomVideoToken(bookingId);
+
+      if (mounted) {
+        if (tokenResp != null && tokenResp.token.isNotEmpty) {
+          debugPrint(
+              'Zoom Video Token fetched successfully: token=${tokenResp.token}, sessionName=${tokenResp.sessionName}, role=${tokenResp.role}');
+          context.push(RouteNames.bookingPreCallCheck, extra: appt);
+        } else {
+          context.push(RouteNames.bookingPreCallCheck, extra: appt);
+        }
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppColors.alertErrorText,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Failed to join session: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: AppColors.alertErrorText,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingToken = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final appt = appointment ??
+    final appt = widget.appointment ??
         const AppointmentModel(
           id: 'bk-01',
           therapistName: 'Dr Priya Nair',
@@ -239,10 +301,8 @@ class BookingPreSessionScreen extends StatelessWidget {
                     // Join session button
                     AppButton(
                       text: 'Join session',
-                      onPressed: () {
-                        context.push(RouteNames.bookingPreCallCheck,
-                            extra: appt);
-                      },
+                      isLoading: _isGeneratingToken,
+                      onPressed: () => _handleJoinSession(appt),
                     ),
                   ],
                 ),

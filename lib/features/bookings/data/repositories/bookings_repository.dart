@@ -3,6 +3,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/dio_client.dart';
 import '../models/booking_response_model.dart';
+import '../models/zoom_token_response_model.dart';
 
 /// Provider for Bookings repository
 final bookingsRepositoryProvider = Provider<BookingsRepository>((ref) {
@@ -65,5 +66,40 @@ class BookingsRepository {
     }
 
     throw Exception(response.message ?? 'Failed to create booking');
+  }
+
+  /// Cancels a booking POST /me/bookings/{bookingId}/cancel
+  Future<bool> cancelBooking(String bookingId) async {
+    try {
+      final endpoint =
+          ApiEndpoints.cancelBooking.replaceAll('{bookingId}', bookingId);
+      final response = await _dioClient.post<Map<String, dynamic>>(
+        endpoint,
+        fromJson: (json) {
+          if (json is Map<String, dynamic>) {
+            return json;
+          }
+          return {'status': 'cancelled'};
+        },
+      );
+      return response.isSuccess;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Fetches short-lived Zoom video token GET /me/bookings/{bookingId}/video-token
+  Future<ZoomTokenResponseModel?> fetchZoomVideoToken(String bookingId) async {
+    final endpoint = ApiEndpoints.getZoomTokenForJoinMeeting
+        .replaceAll('{bookingId}', bookingId);
+    final response = await _dioClient.post<ZoomTokenResponseModel>(
+      endpoint,
+      fromJson: (json) => ZoomTokenResponseModel.fromJson(json),
+    );
+
+    if (response.isSuccess && response.data != null) {
+      return response.data;
+    }
+    return null;
   }
 }

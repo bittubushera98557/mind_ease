@@ -25,6 +25,10 @@ class ApiEndpoints {
   static const String meAssessment = '/me/assessment'; // it will be hit with bearer token
   static const String tokenRefresh = '/auth/refresh'; // {"refreshToken": "string" }
   static const String bookings = '/me/bookings';
+  static const String singleBookingDetail = '/me/bookings/{bookingId}';
+  static const String getZoomTokenForJoinMeeting = '/me/bookings/{bookingId}/video-token';
+  static const String cancelBooking = '/me/bookings/{bookingId}/cancel';
+
 
   static const String config = '/config';
   static const String questionnairesOnboarding = '/questionnaires/onboarding';

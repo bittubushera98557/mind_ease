@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,9 +7,10 @@ import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../data/models/appointment_model.dart';
+import '../providers/bookings_provider.dart';
 
 /// 5.08 Cancel / Reschedule Session Bottom Sheet Modal
-class CancelSessionBottomSheet extends StatelessWidget {
+class CancelSessionBottomSheet extends ConsumerStatefulWidget {
   final AppointmentModel? appt;
 
   const CancelSessionBottomSheet({
@@ -26,8 +28,51 @@ class CancelSessionBottomSheet extends StatelessWidget {
   }
 
   @override
+  ConsumerState<CancelSessionBottomSheet> createState() =>
+      _CancelSessionBottomSheetState();
+}
+
+class _CancelSessionBottomSheetState
+    extends ConsumerState<CancelSessionBottomSheet> {
+  bool _isCancelling = false;
+
+  Future<void> _handleCancelSession(AppointmentModel session) async {
+    setState(() {
+      _isCancelling = true;
+    });
+
+    final bookingId = session.id;
+    final success =
+        await ref.read(bookingsRepositoryProvider).cancelBooking(bookingId);
+
+    // Refresh bookings list dynamically
+    ref.invalidate(myBookingsProvider);
+
+    if (mounted) {
+      setState(() {
+        _isCancelling = false;
+      });
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? 'Session cancelled successfully'
+                : 'Session cancellation submitted',
+          ),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+
+      context.go(RouteNames.dashboard, extra: 2);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final session = appt ??
+    final session = widget.appt ??
         const AppointmentModel(
           id: 'bk-01',
           therapistName: 'Dr Priya Nair',
@@ -178,10 +223,12 @@ class CancelSessionBottomSheet extends StatelessWidget {
 
           // Buttons
           OutlinedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.push(RouteNames.bookingDateTime);
-            },
+            onPressed: _isCancelling
+                ? null
+                : () {
+                    Navigator.pop(context);
+                    context.push(RouteNames.bookingDateTime);
+                  },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
               side: const BorderSide(color: AppColors.inputBorder),
@@ -203,16 +250,14 @@ class CancelSessionBottomSheet extends StatelessWidget {
           AppButton(
             text: 'Cancel session',
             backgroundColor: AppColors.primary,
-            onPressed: () {
-              Navigator.pop(context);
-              context.go(RouteNames.dashboard, extra: 2);
-            },
+            isLoading: _isCancelling,
+            onPressed: () => _handleCancelSession(session),
           ),
           const SizedBox(height: 8),
 
           Center(
             child: TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: _isCancelling ? null : () => Navigator.pop(context),
               child: Text(
                 'Keep session',
                 style: GoogleFonts.plusJakartaSans(

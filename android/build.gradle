@@ -1,14 +1,11 @@
 buildscript {
-    ext.kotlin_version = '1.8.22'
+    ext.kotlin_version = '2.1.0'
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
-        maven { url 'https://repo1.maven.org/maven2/' }
     }
-
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.3.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -30,6 +27,33 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
-task clean(type: Delete) {
+subprojects { project ->
+    project.plugins.withId('com.android.library') {
+        if (!project.android.hasProperty('namespace') || project.android.namespace == null) {
+            def manifestFile = project.file('src/main/AndroidManifest.xml')
+            if (manifestFile.exists()) {
+                def manifestText = manifestFile.text
+                def matcher = manifestText =~ /package="([^"]+)"/
+                if (matcher.find()) {
+                    project.android.namespace = matcher.group(1)
+                }
+            }
+        }
+    }
+    project.plugins.withId('com.android.application') {
+        if (!project.android.hasProperty('namespace') || project.android.namespace == null) {
+            def manifestFile = project.file('src/main/AndroidManifest.xml')
+            if (manifestFile.exists()) {
+                def manifestText = manifestFile.text
+                def matcher = manifestText =~ /package="([^"]+)"/
+                if (matcher.find()) {
+                    project.android.namespace = matcher.group(1)
+                }
+            }
+        }
+    }
+}
+
+tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -7,9 +8,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import '../data/models/appointment_model.dart';
+import 'providers/bookings_provider.dart';
 
 /// 5.06 Booking Confirmation Screen – "You're booked in!"
-class BookingConfirmationScreen extends StatelessWidget {
+class BookingConfirmationScreen extends ConsumerWidget {
   final AppointmentModel? appointment;
 
   const BookingConfirmationScreen({
@@ -18,7 +20,7 @@ class BookingConfirmationScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final appt = appointment ??
         const AppointmentModel(
           id: 'bk-01',
@@ -269,6 +271,7 @@ class BookingConfirmationScreen extends StatelessWidget {
               AppButton(
                 text: 'View appointment',
                 onPressed: () {
+                  ref.invalidate(myBookingsProvider);
                   context.go(RouteNames.dashboard, extra: 2);
                 },
               ),
@@ -277,6 +280,7 @@ class BookingConfirmationScreen extends StatelessWidget {
               // Back to home button
               OutlinedButton(
                 onPressed: () {
+                  ref.invalidate(myBookingsProvider);
                   context.go(RouteNames.dashboard, extra: 0);
                 },
                 style: OutlinedButton.styleFrom(

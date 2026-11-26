@@ -1,3 +1,9 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
@@ -29,21 +35,23 @@ if (keyPropertiesFile.exists()) {
     }
 }
 
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
-
 android {
-    compileSdkVersion 34
-    ndkVersion flutter.ndkVersion
+    namespace "com.app.mind_ease"
+    compileSdkVersion 36
+//    ndkVersion flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
+    /*d-----         3/24/2025  10:40 PM                26.3.11579264
+d-----         11/2/2025   3:19 PM                27.0.12077973
+d-----        11/26/2026   7:30 AM                28.2.13676358*/
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
     }
 
     sourceSets {
@@ -51,14 +59,12 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.app.mind_ease"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-build-configuration.
-        minSdkVersion 24
+        minSdkVersion 28
         targetSdkVersion 36
-        versionCode flutterVersionCode.toInteger()
+        versionCode 4
         versionName flutterVersionName
+        multiDexEnabled true
     }
 
     signingConfigs {
@@ -74,6 +80,7 @@ android {
 
     buildTypes {
         release {
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (keyPropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             } else {
@@ -87,20 +94,8 @@ flutter {
     source '../..'
 }
 
-configurations.all {
-    resolutionStrategy {
-        eachDependency { details ->
-            if (details.requested.group == 'org.jetbrains.kotlin' && 
-                (details.requested.name == 'kotlin-stdlib-jdk7' || details.requested.name == 'kotlin-stdlib-jdk8')) {
-                details.useTarget("org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version")
-            }
-        }
-    }
-}
-
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "com.google.android.material:material:1.9.0"
-    implementation "us.zoom.videosdk:ZoomVideoSDK:1.7.10"
+    implementation "us.zoom.videosdk:zoomvideosdk-core:2.0.0"
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }
-
