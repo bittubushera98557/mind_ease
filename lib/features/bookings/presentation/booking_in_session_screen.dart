@@ -1,27 +1,83 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_zoom_videosdk/flutter_zoom_view.dart' as flutter_zoom_view;
+import 'package:flutter_zoom_videosdk/native/zoom_videosdk.dart';
+import 'package:flutter_zoom_videosdk/native/zoom_videosdk_user.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/router/route_names.dart';
+import '../../../core/services/zoom_video_sdk_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/models/appointment_model.dart';
+import '../data/models/zoom_token_response_model.dart';
 
 /// 5.10 In-Session Video Call Screen
-class BookingInSessionScreen extends StatefulWidget {
+class BookingInSessionScreen extends ConsumerStatefulWidget {
   final AppointmentModel? appointment;
+  final ZoomTokenResponseModel? zoomToken;
 
   const BookingInSessionScreen({
     Key? key,
     this.appointment,
+    this.zoomToken,
   }) : super(key: key);
 
   @override
-  State<BookingInSessionScreen> createState() => _BookingInSessionScreenState();
+  ConsumerState<BookingInSessionScreen> createState() =>
+      _BookingInSessionScreenState();
 }
 
-class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
+class _BookingInSessionScreenState
+    extends ConsumerState<BookingInSessionScreen> {
   bool _isMuted = false;
   bool _isVideoOff = false;
+  ZoomVideoSdkUser? _mySelf;
+  ZoomVideoSdkUser? _remoteTherapist;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSessionUsers();
+  }
+
+  Future<void> _loadSessionUsers() async {
+    final zoomService = ref.read(zoomVideoSdkServiceProvider);
+    final self = await zoomService.getMySelf();
+    final remotes = await zoomService.getRemoteUsers();
+
+    if (mounted) {
+      setState(() {
+        _mySelf = self;
+        if (remotes.isNotEmpty) {
+          _remoteTherapist = remotes.first;
+        }
+      });
+    }
+  }
+
+  void _handleToggleMute() {
+    setState(() {
+      _isMuted = !_isMuted;
+    });
+    ref.read(zoomVideoSdkServiceProvider).toggleAudio(_isMuted);
+  }
+
+  void _handleToggleVideo() {
+    setState(() {
+      _isVideoOff = !_isVideoOff;
+    });
+    ref.read(zoomVideoSdkServiceProvider).toggleVideo(_isVideoOff);
+  }
+
+  void _handleSwitchCamera() {
+    ref.read(zoomVideoSdkServiceProvider).switchCamera();
+  }
+
+  void _handleEndCall(AppointmentModel appt) {
+    ref.read(zoomVideoSdkServiceProvider).leaveSession();
+    context.go(RouteNames.bookingSessionEnded, extra: appt);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,39 +103,58 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
         child: Stack(
           children: [
             // Therapist Main Video Feed Canvas
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE2EFE0),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        appt.therapistInitials,
-                        style: GoogleFonts.outfit(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF26682A),
-                        ),
+            Positioned.fill(
+              child: _remoteTherapist != null
+                  ? ZoomVideoSdkVideoView(
+                      user: _remoteTherapist!,
+                      sharing: false,
+                      preview: false,
+                      focused: true,
+                      hasMultiWindow: false,
+                      isResolutionHD: true,
+                    )
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 96,
+                            height: 96,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE2EFE0),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                appt.therapistInitials,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF26682A),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            appt.therapistName,
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Connecting to session...',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12.5,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    appt.therapistName,
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
             ),
 
             // Top Bar Overlay (Timer & Connection)
@@ -94,7 +169,7 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -110,7 +185,7 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -158,12 +233,24 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
                     ),
                   ],
                 ),
-                child: Center(
-                  child: Icon(
-                    Icons.person_rounded,
-                    size: 32,
-                    color: Colors.white.withOpacity(0.6),
-                  ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: _mySelf != null && !_isVideoOff
+                      ? ZoomVideoSdkVideoView(
+                          user: _mySelf!,
+                          sharing: false,
+                          preview: false,
+                          focused: false,
+                          hasMultiWindow: false,
+                          isResolutionHD: false,
+                        )
+                      : Center(
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 32,
+                            color: Colors.white.withValues(alpha: 0.6),
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -177,7 +264,7 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(28),
                 ),
                 child: Row(
@@ -189,11 +276,7 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
                         _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
                         color: Colors.white,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _isMuted = !_isMuted;
-                        });
-                      },
+                      onPressed: _handleToggleMute,
                     ),
 
                     // Camera
@@ -204,11 +287,7 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
                             : Icons.videocam_rounded,
                         color: Colors.white,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _isVideoOff = !_isVideoOff;
-                        });
-                      },
+                      onPressed: _handleToggleVideo,
                     ),
 
                     // Flip camera
@@ -217,7 +296,7 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
                         Icons.cameraswitch_rounded,
                         color: Colors.white,
                       ),
-                      onPressed: () {},
+                      onPressed: _handleSwitchCamera,
                     ),
 
                     // Notes / Chat
@@ -231,10 +310,7 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
 
                     // End Call (Red Button)
                     GestureDetector(
-                      onTap: () {
-                        context.go(RouteNames.bookingSessionEnded,
-                            extra: appt);
-                      },
+                      onTap: () => _handleEndCall(appt),
                       child: Container(
                         width: 48,
                         height: 48,
@@ -256,6 +332,48 @@ class _BookingInSessionScreenState extends State<BookingInSessionScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Native Video View wrapper widget for Zoom Video SDK user feed
+class ZoomVideoSdkVideoView extends StatelessWidget {
+  final ZoomVideoSdkUser user;
+  final bool sharing;
+  final bool preview;
+  final bool focused;
+  final bool hasMultiWindow;
+  final bool isResolutionHD;
+
+  const ZoomVideoSdkVideoView({
+    Key? key,
+    required this.user,
+    this.sharing = false,
+    this.preview = false,
+    this.focused = false,
+    this.hasMultiWindow = false,
+    this.isResolutionHD = false,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<String, dynamic> creationParams = <String, dynamic>{
+      "userId": preview ? "" : user.userId,
+      "sharing": sharing,
+      "preview": preview,
+      "focused": focused,
+      "hasMultiCamera": false,
+      "isPiPView": false,
+      "videoAspect": VideoAspect.PanAndScan,
+      "fullScreen": true,
+      "resolution": isResolutionHD
+          ? VideoResolution.Resolution720
+          : VideoResolution.Resolution360,
+    };
+
+    return flutter_zoom_view.View(
+      key: Key('zoom_view_${user.userId}_$sharing'),
+      creationParams: creationParams,
     );
   }
 }

@@ -46,10 +46,14 @@ class _BookingPreSessionScreenState
         if (tokenResp != null && tokenResp.token.isNotEmpty) {
           debugPrint(
               'Zoom Video Token fetched successfully: token=${tokenResp.token}, sessionName=${tokenResp.sessionName}, role=${tokenResp.role}');
-          context.push(RouteNames.bookingPreCallCheck, extra: appt);
-        } else {
-          context.push(RouteNames.bookingPreCallCheck, extra: appt);
         }
+        context.push(
+          RouteNames.bookingPreCallCheck,
+          extra: {
+            'appointment': appt,
+            'zoomToken': tokenResp,
+          },
+        );
       }
     } on ApiException catch (e) {
       if (mounted) {

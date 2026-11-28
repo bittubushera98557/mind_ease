@@ -1,31 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/router/route_names.dart';
+import '../../../core/services/zoom_video_sdk_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/circular_back_button.dart';
+import '../../auth/presentation/providers/auth_provider.dart';
 import '../data/models/appointment_model.dart';
+import '../data/models/zoom_token_response_model.dart';
 
 /// 5.09 Pre-call Hardware & Connection Check Screen
-class BookingPreCallCheckScreen extends StatefulWidget {
+class BookingPreCallCheckScreen extends ConsumerStatefulWidget {
   final AppointmentModel? appointment;
+  final ZoomTokenResponseModel? zoomToken;
 
   const BookingPreCallCheckScreen({
     Key? key,
     this.appointment,
+    this.zoomToken,
   }) : super(key: key);
 
   @override
-  State<BookingPreCallCheckScreen> createState() =>
+  ConsumerState<BookingPreCallCheckScreen> createState() =>
       _BookingPreCallCheckScreenState();
 }
 
-class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
+class _BookingPreCallCheckScreenState
+    extends ConsumerState<BookingPreCallCheckScreen> {
   bool _isMicMuted = false;
   bool _isCameraOff = false;
+  bool _isJoining = false;
+
+  Future<void> _handleJoinMeeting(AppointmentModel appt) async {
+    setState(() {
+      _isJoining = true;
+    });
+
+    try {
+      final zoomService = ref.read(zoomVideoSdkServiceProvider);
+      final user = ref.read(authStateProvider).user;
+      final userName = user?.name.isNotEmpty == true ? user!.name : 'Client';
+      debugPrint("_handleJoinMeeting try");
+
+      if (widget.zoomToken != null && widget.zoomToken!.token.isNotEmpty) {
+        await zoomService.joinSession(
+          sessionName: widget.zoomToken!.sessionName,
+          token: widget.zoomToken!.token,
+          userName: userName,
+        );
+      } else {
+        await zoomService.initSdk();
+      }
+
+      if (mounted) {
+        context.push(
+          RouteNames.bookingInSession,
+          extra: {
+            'appointment': appt,
+            'zoomToken': widget.zoomToken,
+          },
+        );
+      }
+
+    } catch (e) {
+      debugPrint("_handleJoinMeeting catch");
+      if (mounted) {
+        context.push(
+          RouteNames.bookingInSession,
+          extra: {
+            'appointment': appt,
+            'zoomToken': widget.zoomToken,
+          },
+        );
+      }
+    } finally {
+      debugPrint("_handleJoinMeeting finally");
+      if (mounted) {
+        setState(() {
+          _isJoining = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +155,7 @@ class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
                     Center(
                       child: CircleAvatar(
                         radius: 36,
-                        backgroundColor: Colors.white.withOpacity(0.12),
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
                         child: const Icon(
                           Icons.person_rounded,
                           size: 40,
@@ -192,17 +252,26 @@ class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
                         ),
                         Row(
                           children: [
-                            Container(width: 3, height: 8, color: const Color(0xFF7EAA83)),
+                            Container(
+                                width: 3,
+                                height: 8,
+                                color: const Color(0xFF7EAA83)),
                             const SizedBox(width: 2),
-                            Container(width: 3, height: 12, color: const Color(0xFF7EAA83)),
+                            Container(
+                                width: 3,
+                                height: 12,
+                                color: const Color(0xFF7EAA83)),
                             const SizedBox(width: 2),
-                            Container(width: 3, height: 16, color: const Color(0xFF7EAA83)),
+                            Container(
+                                width: 3,
+                                height: 16,
+                                color: const Color(0xFF7EAA83)),
                           ],
                         ),
                       ],
                     ),
-                    const Divider(height: 16, thickness: 1, color: Color(0xFFF4EFEA)),
-
+                    const Divider(
+                        height: 16, thickness: 1, color: Color(0xFFF4EFEA)),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -223,8 +292,8 @@ class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
                         ),
                       ],
                     ),
-                    const Divider(height: 16, thickness: 1, color: Color(0xFFF4EFEA)),
-
+                    const Divider(
+                        height: 16, thickness: 1, color: Color(0xFFF4EFEA)),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -237,7 +306,8 @@ class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEDF7EE),
                             borderRadius: BorderRadius.circular(6),
@@ -272,9 +342,8 @@ class _BookingPreCallCheckScreenState extends State<BookingPreCallCheckScreen> {
               // Join Session Button
               AppButton(
                 text: 'Join session',
-                onPressed: () {
-                  context.push(RouteNames.bookingInSession, extra: appt);
-                },
+                isLoading: _isJoining,
+                onPressed: () => _handleJoinMeeting(appt),
               ),
               const SizedBox(height: 8),
 

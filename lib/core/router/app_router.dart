@@ -38,6 +38,7 @@ import '../../features/bookings/presentation/booking_pre_session_screen.dart';
 import '../../features/bookings/presentation/booking_pre_call_check_screen.dart';
 import '../../features/bookings/presentation/booking_in_session_screen.dart';
 import '../../features/bookings/presentation/booking_session_ended_screen.dart';
+import '../../features/bookings/data/models/zoom_token_response_model.dart';
 import '../../features/bookings/data/models/appointment_model.dart';
 import '../../features/welcome/presentation/welcome_screen.dart';
 import 'route_names.dart';
@@ -201,15 +202,43 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.bookingPreCallCheck,
         pageBuilder: (context, state) {
-          final appt = state.extra as AppointmentModel?;
-          return _buildPage(BookingPreCallCheckScreen(appointment: appt), state);
+          AppointmentModel? appt;
+          ZoomTokenResponseModel? tokenData;
+          if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            appt = map['appointment'] as AppointmentModel?;
+            tokenData = map['zoomToken'] as ZoomTokenResponseModel?;
+          } else if (state.extra is AppointmentModel) {
+            appt = state.extra as AppointmentModel?;
+          }
+          return _buildPage(
+            BookingPreCallCheckScreen(
+              appointment: appt,
+              zoomToken: tokenData,
+            ),
+            state,
+          );
         },
       ),
       GoRoute(
         path: RouteNames.bookingInSession,
         pageBuilder: (context, state) {
-          final appt = state.extra as AppointmentModel?;
-          return _buildPage(BookingInSessionScreen(appointment: appt), state);
+          AppointmentModel? appt;
+          ZoomTokenResponseModel? tokenData;
+          if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            appt = map['appointment'] as AppointmentModel?;
+            tokenData = map['zoomToken'] as ZoomTokenResponseModel?;
+          } else if (state.extra is AppointmentModel) {
+            appt = state.extra as AppointmentModel?;
+          }
+          return _buildPage(
+            BookingInSessionScreen(
+              appointment: appt,
+              zoomToken: tokenData,
+            ),
+            state,
+          );
         },
       ),
       GoRoute(

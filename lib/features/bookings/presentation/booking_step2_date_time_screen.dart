@@ -210,103 +210,14 @@ class _BookingStep2DateTimeScreenState
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // YOUR THERAPIST Card (Dynamic)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.inputBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'YOUR THERAPIST',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
-                        color: const Color(0xFFB45309),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE2EFE0),
-                            shape: BoxShape.circle,
-                          ),
-                          child: ClipOval(
-                            child: therapist?.photoUrl != null &&
-                                    therapist!.photoUrl!.isNotEmpty
-                                ? Image.network(
-                                    therapist.photoUrl!,
-                                    fit: BoxFit.cover,
-                                    width: 44,
-                                    height: 44,
-                                    errorBuilder: (_, __, ___) => Center(
-                                      child: Text(
-                                        therapist.initials,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF26682A),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      therapist?.initials ?? 'DP',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w700,
-                                        color: const Color(0xFF26682A),
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                therapist?.name ?? 'Dr Paras',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                '${therapist?.sessionMinutes ?? 50} min video • ${therapist?.formattedPrice ?? r"$150"}',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11.5,
-                                  color: AppColors.textTertiary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Matched on ${formState.selectedFocusAreas.map(cleanFocusLabel).join(", ")}. Assigned automatically.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+              // Scrollable Therapists Selector Section
+              _buildTherapistsSelectorSection(
+                context,
+                ref,
+                therapistsAsync,
+                therapist,
+                formNotifier,
+                formState.selectedFocusAreas,
               ),
               const SizedBox(height: AppSpacing.xl),
 
@@ -703,6 +614,264 @@ class _BookingStep2DateTimeScreenState
           }).toList(),
         ),
         const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildTherapistsSelectorSection(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<TherapistsListResp> therapistsAsync,
+    TherapistModel? selectedTherapist,
+    BookingFormNotifier formNotifier,
+    List<String> selectedFocusAreas,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'SELECT YOUR THERAPIST',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+                color: const Color(0xFFB45309),
+              ),
+            ),
+            therapistsAsync.when(
+              data: (resp) => Text(
+                '${resp.therapists.length} available',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        therapistsAsync.when(
+          data: (resp) {
+            final therapistsList = resp.therapists;
+            if (therapistsList.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.inputBorder),
+                ),
+                child: Text(
+                  'No therapists found matching your focus areas.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
+            return SizedBox(
+              height: 125,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: therapistsList.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final t = therapistsList[index];
+                  final isSelected = selectedTherapist?.id == t.id;
+
+                  return GestureDetector(
+                    onTap: () {
+                      formNotifier.updateTherapist(t);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 250,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primarySubtle
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.inputBorder,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE2EFE0),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: ClipOval(
+                                  child: t.photoUrl != null &&
+                                          t.photoUrl!.isNotEmpty
+                                      ? Image.network(
+                                          t.photoUrl!,
+                                          fit: BoxFit.cover,
+                                          width: 42,
+                                          height: 42,
+                                          errorBuilder: (_, __, ___) => Center(
+                                            child: Text(
+                                              t.initials,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700,
+                                                color: const Color(0xFF26682A),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            t.initials,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF26682A),
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      t.name,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${t.sessionMinutes} min video • ${t.formattedPrice}',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11.5,
+                                        color: AppColors.textTertiary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            t.specialties.isNotEmpty
+                                ? 'Specialties: ${t.specialties.join(", ")}'
+                                : 'Matched on selected focus areas',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: isSelected
+                                  ? AppColors.primaryDark
+                                  : AppColors.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+          loading: () => SizedBox(
+            height: 125,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 3,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, __) => Container(
+                width: 250,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.inputBorder),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          error: (err, stack) => Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded,
+                    color: AppColors.alertErrorText, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Failed to load therapists list.',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12.5,
+                      color: AppColors.alertErrorText,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    ref.invalidate(therapistsListProvider);
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

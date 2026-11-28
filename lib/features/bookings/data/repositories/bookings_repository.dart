@@ -88,12 +88,18 @@ class BookingsRepository {
     }
   }
 
-  /// Fetches short-lived Zoom video token GET /me/bookings/{bookingId}/video-token
-  Future<ZoomTokenResponseModel?> fetchZoomVideoToken(String bookingId) async {
+  /// Fetches short-lived Zoom video token POST /me/bookings/{bookingId}/video-token
+  Future<ZoomTokenResponseModel?> fetchZoomVideoToken(
+    String bookingId, {
+    bool skipJoinWindow = true,
+  }) async {
     final endpoint = ApiEndpoints.getZoomTokenForJoinMeeting
         .replaceAll('{bookingId}', bookingId);
     final response = await _dioClient.post<ZoomTokenResponseModel>(
       endpoint,
+      body: {
+        'skipJoinWindow': skipJoinWindow,
+      },
       fromJson: (json) => ZoomTokenResponseModel.fromJson(json),
     );
 

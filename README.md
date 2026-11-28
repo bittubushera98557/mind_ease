@@ -17,3 +17,11 @@ samples, guidance on mobile development, and a full API reference.
 
 dart 2.18.2
 flutter 3.3.3
+
+
+after booking detail screen (means click on join session)- user coming on 
+
+lib/features/bookings/presentation/booking_pre_call_check_screen.dart
+
+finally user in meeting on
+lib/features/bookings/presentation/booking_in_session_screen.dart
