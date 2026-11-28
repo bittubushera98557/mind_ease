@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/router/route_names.dart';
 import '../../../core/services/zoom_video_sdk_service.dart';
@@ -35,6 +36,17 @@ class _BookingPreCallCheckScreenState
   bool _isCameraOff = false;
   bool _isJoining = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _requestInitialPermissions();
+  }
+
+  Future<void> _requestInitialPermissions() async {
+    final zoomService = ref.read(zoomVideoSdkServiceProvider);
+    await zoomService.requestPermissions();
+  }
+
   Future<void> _handleJoinMeeting(AppointmentModel appt) async {
     setState(() {
       _isJoining = true;
@@ -42,6 +54,41 @@ class _BookingPreCallCheckScreenState
 
     try {
       final zoomService = ref.read(zoomVideoSdkServiceProvider);
+
+      // Check and request runtime permissions before joining meeting
+      final permissionsGranted = await zoomService.requestPermissions();
+      if (!permissionsGranted) {
+        final cameraStatus = await Permission.camera.status;
+        final micStatus = await Permission.microphone.status;
+
+        if (cameraStatus.isPermanentlyDenied || micStatus.isPermanentlyDenied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Camera and Microphone permissions are permanently denied. Please enable them in app settings.',
+                ),
+                action: SnackBarAction(
+                  label: 'Settings',
+                  onPressed: openAppSettings,
+                ),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Camera and Microphone permissions are required to join the session.',
+                ),
+              ),
+            );
+          }
+        }
+        return;
+      }
+
       final user = ref.read(authStateProvider).user;
       final userName = user?.name.isNotEmpty == true ? user!.name : 'Client';
       debugPrint("_handleJoinMeeting try");

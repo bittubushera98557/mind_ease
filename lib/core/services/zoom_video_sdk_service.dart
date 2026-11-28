@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_zoom_videosdk/native/zoom_videosdk.dart';
+import 'package:flutter_zoom_videosdk/native/zoom_videosdk_event_listener.dart';
 import 'package:flutter_zoom_videosdk/native/zoom_videosdk_user.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../network/api_client.dart';
 
@@ -9,11 +11,32 @@ import '../network/api_client.dart';
 class ZoomVideoSdkService {
   final ApiClient _apiClient;
   final ZoomVideoSdk _zoomSdk = ZoomVideoSdk();
+  final ZoomVideoSdkEventListener _eventListener = ZoomVideoSdkEventListener();
 
   ZoomVideoSdkService(this._apiClient);
 
   ApiClient get apiClient => _apiClient;
   ZoomVideoSdk get zoomSdk => _zoomSdk;
+  ZoomVideoSdkEventListener get eventListener => _eventListener;
+
+  /// Requests Camera and Microphone permissions required by Zoom Video SDK
+  Future<bool> requestPermissions() async {
+    try {
+      final statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      final cameraGranted = statuses[Permission.camera]?.isGranted ?? false;
+      final micGranted = statuses[Permission.microphone]?.isGranted ?? false;
+
+      debugPrint('Zoom SDK permissions - Camera: $cameraGranted, Mic: $micGranted');
+      return cameraGranted && micGranted;
+    } catch (e) {
+      debugPrint('Zoom SDK requestPermissions error: $e');
+      return false;
+    }
+  }
 
   /// Initializes Zoom Video SDK
   Future<bool> initSdk() async {
@@ -40,12 +63,21 @@ class ZoomVideoSdkService {
     String? sessionPassword,
   }) async {
     try {
+      await requestPermissions();
       await initSdk();
       final joinConfig = JoinSessionConfig(
         sessionName: sessionName.isNotEmpty ? sessionName : 'mindease-session',
         token: token,
         userName: userName.isNotEmpty ? userName : 'Client',
         sessionPassword: sessionPassword ?? '',
+        audioOptions: {
+          'connect': true,
+          'mute': false,
+          'autoAdjustSpeakerVolume': true,
+        },
+        videoOptions: {
+          'localVideoOn': true,
+        },
       );
       await _zoomSdk.joinSession(joinConfig);
       debugPrint('Zoom SDK joinSession Successfully joined Zoom session: $sessionName');
@@ -141,7 +173,14 @@ class ZoomVideoSdkService {
   void listenToEvents({
     void Function(dynamic status)? onStatusChanged,
     void Function(dynamic reason)? onEnded,
-  }) {}
+  }) {
+    if (onStatusChanged != null) {
+      _eventListener.addListener(EventType.onSessionJoin, onStatusChanged);
+    }
+    if (onEnded != null) {
+      _eventListener.addListener(EventType.onSessionLeave, onEnded);
+    }
+  }
 
   void dispose() {}
 }
